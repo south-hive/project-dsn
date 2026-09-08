@@ -1,5 +1,7 @@
 # 배포 View와 수명주기 경계
 
+> 상세 설계 참조입니다. 처음 읽는 부서원은 [전체 → 기능 → 담당 작업 안내](../development/README.md)에서 시작하세요. 아래 초기 설계의 미정/제안과 현재 구현 선택은 [구현 계약](../implementation/contracts.md)을 함께 확인합니다.
+
 ## DEP-01. 목표 배포
 
 같은 호스트의 Source는 Docker 밖, C# DSN은 Docker 안에서 실행한다. 원격 연결은 View 조회 경로다. 중계는 외부 Source 담당 범위이며 DSN과의 경계는 RPC다. 저장소 배치는 미정이다.

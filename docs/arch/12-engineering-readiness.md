@@ -1,5 +1,7 @@
 # 개발 준비도와 보완 계약
 
+> 상세 설계 참조입니다. 처음 읽는 부서원은 [전체 → 기능 → 담당 작업 안내](../development/README.md)에서 시작하세요. 아래 초기 설계의 미정/제안과 현재 구현 선택은 [구현 계약](../implementation/contracts.md)을 함께 확인합니다.
+
 ## 점검 결과
 
 Source 구체 구현은 외부 담당 범위다. 아래 개발 준비도는 DSN·RPC 인터페이스·Mock을 기준으로 판단하며 Source 내부 API·탄창·kernel/eBPF의 결정을 DSN 착수 조건으로 두지 않는다.

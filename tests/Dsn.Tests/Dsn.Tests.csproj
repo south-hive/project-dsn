@@ -1,0 +1,1 @@
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType></PropertyGroup><ItemGroup><ProjectReference Include="../../src/Dsn.Core/Dsn.Core.csproj" /><ProjectReference Include="../../src/Dsn.Workspaces/Dsn.Workspaces.csproj" /><ProjectReference Include="../../src/Dsn.Host/Dsn.Host.csproj" /></ItemGroup></Project>

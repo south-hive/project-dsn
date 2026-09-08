@@ -1,5 +1,7 @@
 # 검증·계측·요구사항 추적
 
+> 상세 설계 참조입니다. 처음 읽는 부서원은 [전체 → 기능 → 담당 작업 안내](../development/README.md)에서 시작하세요. 아래 초기 설계의 미정/제안과 현재 구현 선택은 [구현 계약](../implementation/contracts.md)을 함께 확인합니다.
+
 ## 단계 구분
 
 DSN 검증은 RPC 입력 경계부터 수행한다. Source 내부 비대기·탄창·kernel/eBPF 구현의 검증은 외부 담당 책임이며 DSN 1차 인수 조건이 아니다. RPC 검증 client와 fixture로 서버·Mock을 확인한다.

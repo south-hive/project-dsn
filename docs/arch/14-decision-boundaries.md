@@ -1,5 +1,7 @@
 # 담당자 결정과 경계 계약 협의
 
+> 상세 설계 참조입니다. 처음 읽는 부서원은 [전체 → 기능 → 담당 작업 안내](../development/README.md)에서 시작하세요. 아래 초기 설계의 미정/제안과 현재 구현 선택은 [구현 계약](../implementation/contracts.md)을 함께 확인합니다.
+
 ## 판단 기준
 
 Source 내부 구현은 외부 Source 담당자가 결정한다. DSN은 RPC 계약·서버·Mock에 집중하며 Source 내부 API·탄창·메모리·kernel/eBPF·중계 구현 방식의 협의를 요구하지 않는다. RPC 경계가 바뀌는 경우에만 해당 Source 담당자와 호환성을 협의한다. S/K 표기는 DSN 구현 track이 아닌 외부 담당을 뜻한다.

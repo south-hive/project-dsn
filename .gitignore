@@ -4,3 +4,9 @@
 /prototype/reports/*.tap
 /prototype/reports/*.json
 /tests/results/
+**/bin/
+**/obj/
+/data/
+/artifacts/
+/settings.docker.json
+/settings.local.json

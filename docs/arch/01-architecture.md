@@ -1,5 +1,7 @@
 # 아키텍처
 
+> 상세 설계 참조입니다. 처음 읽는 부서원은 [전체 → 기능 → 담당 작업 안내](../development/README.md)에서 시작하세요. 아래 초기 설계의 미정/제안과 현재 구현 선택은 [구현 계약](../implementation/contracts.md)을 함께 확인합니다.
+
 ## 시스템 범위와 우선순위
 
 DSN은 C#으로 구현하며 Docker 이미지로 배포한다. Source 구현은 각 Source 담당자의 책임이다. DSN은 Source에 RPC 연동 인터페이스를 제공한다. 현재 대상은 CentOS 9의 C++ 앱과 Linux 커널 드라이버이며, 드라이버에서 eBPF로 발행하는 경로도 포함한다.

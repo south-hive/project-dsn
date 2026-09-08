@@ -1,5 +1,7 @@
 # Source 연동 인터페이스와 DSN Mock
 
+> 상세 설계 참조입니다. 처음 읽는 부서원은 [전체 → 기능 → 담당 작업 안내](../development/README.md)에서 시작하세요. 아래 초기 설계의 미정/제안과 현재 구현 선택은 [구현 계약](../implementation/contracts.md)을 함께 확인합니다.
+
 ## 책임 경계 — 확정
 
 Source의 구체 구현은 각 Source 담당자가 결정한다. DSN은 **RPC 연동 인터페이스, envelope 계약, 서버 수신부, Mock과 계약 검증 자료**를 제공한다. 현재 연동 대상은 CentOS 9 C++ 앱과 Linux driver/eBPF 경로이며 이 환경의 내부 구현·라이브러리 배포는 DSN 개발 범위 밖이다.

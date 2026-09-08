@@ -1,0 +1,13 @@
+services:
+  dsn:
+    build: .
+    command: ["/config/settings.json"]
+    ports:
+      - "127.0.0.1:7070:7070"
+      - "127.0.0.1:7071:7071"
+    volumes:
+      - dsn-data:/data
+      - ./settings.docker.json:/config/settings.json:ro
+    stop_grace_period: 30s
+volumes:
+  dsn-data:

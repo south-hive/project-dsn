@@ -1,5 +1,7 @@
 # 계약과 메시지 수명
 
+> 상세 설계 참조입니다. 처음 읽는 부서원은 [전체 → 기능 → 담당 작업 안내](../development/README.md)에서 시작하세요. 아래 초기 설계의 미정/제안과 현재 구현 선택은 [구현 계약](../implementation/contracts.md)을 함께 확인합니다.
+
 ## Envelope — 논리 필드 확정, wire format 미정
 
 | 필드 | 의미 |
