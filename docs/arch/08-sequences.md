@@ -1,6 +1,6 @@
 # 주요 실행 시퀀스
 
-아래는 확정된 책임을 연결한 **수명주기 구현안**이다. DSN 시작·종료 정책, Source 재접속·잔여 탄창 정책은 F-03·H-01에서 구체화한다. 메시지 ACK/NACK은 추가하지 않는다. 시간 제한의 수치는 미정이다.
+아래는 확정된 책임을 연결한 **수명주기 구현안**이다. DSN lifecycle은 H-01, RPC 연동은 F-02·F-03에서 구체화한다. Source 내부 구현과 재접속·잔여 탄창 정책은 외부 담당자가 정한다. 아래 Source 내부 화살표는 요구 동작을 설명하는 참고 예시이며 DSN 구현 명세가 아니다. 메시지 ACK/NACK은 추가하지 않는다. 시간 제한의 수치는 미정이다.
 
 ## SEQ-01. DSN 실행
 
@@ -14,7 +14,7 @@ sequenceDiagram
     participant Loader as Plugin Loader
     participant Registry as Bulletin Board Registry
     participant Run as Sequential Executor
-    participant Transport as Transport Adapter
+    participant Transport as RPC Server Adapter
     participant View as View Service
     Operator->>Host: DSN 시작
     Host->>Error: 초기화 및 오류 접수 활성화
@@ -47,7 +47,7 @@ sequenceDiagram
     actor Operator as 운영자
     participant Host as DSN Host
     participant View as View Service
-    participant Transport as Transport Adapter
+    participant Transport as RPC Server Adapter
     participant Queue as Signal Buffer
     participant Run as Executor / Workspace
     participant Memory as Message Lifetime
@@ -97,7 +97,7 @@ sequenceDiagram
     participant App as 원 프로젝트
     participant SDK as Fire Gun / Magazine
     participant Sender as Source Sender
-    participant Transport as DSN Transport
+    participant Transport as DSN RPC Server
     participant Session as Session Context
     App->>SDK: 초기화 및 발행 준비
     SDK->>Sender: 전송 실행 흐름 시작
@@ -114,7 +114,7 @@ sequenceDiagram
     Note over App,Session: attach 결과는 개별 메시지 ACK가 아니며 Publish는 접속 완료를 기다리지 않음
 ```
 
-attach는 전송 기술에 따라 연결 생성 또는 논리 송신 경로 활성화를 뜻한다. 별도 DSN 등록 handshake를 요구하지 않는다. 연결과 `source_id` 매핑은 F-02에서 정하며, envelope을 보기 전에는 source_id가 알려지지 않을 수 있다. 초기화 자체의 실패 보고 방식은 발행 API와 분리하여 F-03에서 정의한다.
+attach는 선택한 RPC 방식에 따른 연결 생성 또는 논리 호출 경로 활성화를 뜻한다. 별도 DSN 등록 handshake를 요구하지 않는다. 연결과 `source_id` 매핑은 F-02에서 정하며, envelope을 보기 전에는 source_id가 알려지지 않을 수 있다. Source 내부 초기화·발행 API는 Source 담당자가 정하며 F-03에서는 RPC 연동 요구를 전달한다.
 
 ## SEQ-04. Source 정상 detach
 
@@ -123,7 +123,7 @@ sequenceDiagram
     participant App as 원 프로젝트
     participant SDK as Fire Gun / Magazine
     participant Sender as Source Sender
-    participant Transport as DSN Transport
+    participant Transport as DSN RPC Server
     participant Queue as DSN Queue / Executor
     App->>SDK: detach 또는 SDK 종료 요청
     SDK->>SDK: 신규 적재 종료 상태 전환
@@ -137,14 +137,14 @@ sequenceDiagram
     Note over App,SDK: 전환 중 Publish는 즉시 폐기, 해제된 SDK 객체 호출은 지원 계약 밖
 ```
 
-detach 시 미송신 메시지를 폐기하는 것을 초기안으로 두되 F-03에서 고정한다. 종료 호출의 동기화와 unload 순서는 발행 호출과 구분한다. DSN이 인계받은 메시지를 Source detach만으로 강제 해제하지 않는다.
+Source의 잔여 탄창 처리와 SDK 종료 방식은 Source 담당자가 정한다. 종료 호출의 동기화와 unload 순서는 발행 호출과 구분한다. DSN이 인계받은 메시지를 Source detach만으로 강제 해제하지 않는다.
 
 ## SEQ-05. Source 오류에 따른 연결 종료 및 재attach
 
 ```mermaid
 sequenceDiagram
     participant Sender as Source Sender
-    participant TA as Transport Adapter
+    participant TA as RPC Server Adapter
     participant Core as Ingress / 내부 처리
     participant Policy as 오류 분류 및 연결 제어
     participant Error as Error Intake
@@ -217,7 +217,7 @@ sequenceDiagram
     Note over Run,Memory: ref count 1 → 0, 원본 회수
 ```
 
-그림의 정상 후반 경로는 적재·전송·수신에 성공한 메시지에만 적용한다. Workspace가 자신의 참조를 반납해도 Executor의 root는 마지막 호출까지 유지된다. 따라서 저장이 느리면 root 보유 시간은 여전히 늘어날 수 있다. 별도 record 쓰기 큐를 현재 계약에 암묵적으로 추가하지 않으며 P-01·P-02에서 저장 반환 의미를 정하고 X-04에서 측정한다.
+그림의 정상 후반 경로는 적재·전송·수신에 성공한 메시지에만 적용한다. Workspace가 자신의 참조를 반납해도 Executor의 root는 마지막 호출까지 유지된다. 따라서 저장이 느리면 root 보유 시간은 여전히 늘어날 수 있다. 별도 record 쓰기 큐를 현재 계약에 암묵적으로 추가하지 않으며 P-01·P-02에서 저장 반환 의미를 정하고 1차 완료 이후 X-04에서 평가한다.
 
 ## SEQ-07. 수신 실패와 Workspace 실패
 

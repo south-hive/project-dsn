@@ -5,7 +5,7 @@
 | ID | 결정 |
 | --- | --- |
 | D01 | DSN은 C#으로 구현하고 Docker로 배포한다. |
-| D02 | Source는 원 프로젝트 환경별 라이브러리로 제공한다. 현재 C++ 앱(CentOS 9), Linux 커널 드라이버, eBPF 발행 경로를 대상으로 한다. |
+| D02 | C++ 앱(CentOS 9), Linux driver/eBPF는 외부 Source 담당자가 구현한다. DSN은 RPC 연동 인터페이스·Mock·검증 자료를 제공한다. |
 | D03 | Source와 DSN은 현재 같은 호스트이며 Docker 밖과 안으로 나뉜다. 원격은 View를 기준으로 연결한다. |
 | D04 | Source 발행은 내부 fire gun 탄창에 적재하는 것으로 끝낸다. 탄창은 넉넉해야 한다. |
 | D05 | Source 호출은 no blocking / no error / no exception이며 손실을 허용한다. ACK/NACK을 요구하지 않는다. |
@@ -30,15 +30,17 @@
 | D24 | Persistence는 record 저장·조회·export를 담당한다. View는 조회 인터페이스로 사용자별 field 선택·조합을 제공하고 Workspace를 직접 조회하지 않는다. |
 | D25 | Workspace에는 등록·처리, 메시지 참조, record 저장 및 필요한 진단 계약만 공개한다. 큐·dispatcher·registry 변경·원본 할당과 강제 회수는 DSN 내부로 제한한다. |
 
+| D26 | Source 내부 구현은 Source 담당자가 결정한다. DSN과 Source의 공통 설계 범위는 우선 RPC 계약이며 특정 framework는 미정이다. |
+
 ## 구현 전 우선 결정할 사항
 
 | 항목 | 필요한 이유 |
 | --- | --- |
-| 정확한 OS·커널·eBPF 실행 환경 | Source API와 중계 경로의 실현 가능성 확인 |
-| Source–DSN 전송 기술 및 컨테이너 연결 방식 | SDK·실제 Ingress·Mock의 동일 입력 계약 수립 |
+| DSN host·.NET·RPC 검증 환경 | DSN 서버와 Mock의 build·실행 조건; Source kernel 환경은 외부 담당 |
+| RPC 방식 및 컨테이너 endpoint | Source·DSN·Mock의 동일 RPC 입력 계약 수립 |
 | Envelope 직렬화, 버전 선택용 최소 공통 헤더와 framing | 언어가 다른 Source와 C# DSN의 상호 운용 |
 | 최대 메시지 크기, 빈 payload 및 잘못된 필드 처리 | decoder와 버퍼의 구조적 유효성 정의 |
-| Source 탄창 소유권, 준비 API, 용량 | 호출 반환 후 데이터 수명과 메모리 사용량 정의 |
+| Source 전달 인터페이스·예제 | RPC 규격과 요구 동작 전달; 탄창·준비 API·용량은 Source 담당 |
 | 버퍼 구조와 복수 큐 병합 | producer 동시성과 FIFO 범위 구체화 |
 | Workspace 플러그인 계약·발견 경로·버전 호환성 | 동적 로딩과 안정적인 등록 구현 |
 | 미등록 Workspace 이름 및 중복 대상 이름 처리 | 일부 대상 실패 시 전달 및 ref count 처리 정의 |
@@ -81,13 +83,22 @@ Admin 메시지의 중첩 envelope 구조와 원본 첨부는 현재 계약에 �
 | --- | --- |
 | 환경·toolchain·패키지 배치 | [F-01](planning/track-f.md#f-01) |
 | wire format·최소 헤더·transport·session 매핑 | [F-02](planning/track-f.md#f-02) |
-| Source 준비·탄창 소유권·detach·재접속 | [F-03](planning/track-f.md#f-03) |
+| Source 전달용 RPC 규격·fixture·예제 | [F-03](planning/track-f.md#f-03) |
 | 실제 공개 API·Checkout·Checkin·대상/실패 규칙 | [F-04](planning/track-f.md#f-04) |
 | record·query·export·View 조합 의미 | [F-05](planning/track-f.md#f-05) |
-| 성능 workload·계측 목표 | [F-06](planning/track-f.md#f-06) |
+| QA·위험·관측 아이디어 — 현재; 상세 계측은 1차 이후 | [F-06](planning/track-f.md#f-06) |
 | Admin 전달·첨부·동일성·갱신 | [A-01](planning/track-a.md#a-01) |
 | 실제 저장소 | [P-02](planning/track-p.md#p-02) |
 | 사용자 View API·정의 보존·접근 범위 | [V-01](planning/track-v.md#v-01) |
 | plugin 발견·호환성·시작·종료 정책 | [H-01](planning/track-h.md#h-01) |
 
 운영 임계값과 재정렬·Workspace 격리는 구현 인터페이스를 마련한 뒤 측정 결과에 따라 결정한다. Admin 상세 결정은 해당 Workspace 구현 시 수행하며 초기 Source→Mock 경로의 선행 조건이 아니다.
+
+## 1차 개발과 후속 품질 평가
+
+- 현재는 Quality Attribute·위험 가설·관측 아이디어를 등록한다.
+- 기본 기능과 소유권·실패·종료 계약의 정확성 검증은 1차 개발에 포함한다.
+- 상세 monitoring 구현, 운영 지표·수집·알림·자동 조치와 부하 기반 개선은 1차 완료 이후로 보류한다.
+- X-05가 1차 인수 지점이다. E-02·X-04는 X-05 이후이며 1차 완료의 선행 조건이 아니다.
+
+개발 전 보완 계약은 [GAP-01–10](12-engineering-readiness.md), 품질 위험은 [QA·Risk 등록부](13-quality-attributes-and-risks.md)에 연결한다.

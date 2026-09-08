@@ -8,8 +8,8 @@
 
 | 모듈 | 책임 및 산출물 | 제공 계약 | 사용하는 계약 |
 | --- | --- | --- | --- |
-| Source SDK / 환경별 adapter | C++·커널·eBPF 발행 경로와 예제 | IMessageBuilder, IEventPublisher에 해당하는 환경별 API | 공통 envelope 및 전송 규약 |
-| Transport Adapter | 연결·수신·연결 종료 | 내부 전송 계약 | 입력 계약, IErrorSink |
+| Source — 외부 | 내부 구현은 Source 담당 | RPC 요청 계약 준수 | DSN 제공 RPC 규격·Mock |
+| RPC Server Adapter | RPC 요청·session·종료 | 외부 RPC 계약 / 내부 입력 계약 | IErrorSink |
 | Envelope Decoder | 버전 선택 및 구조 검증 | 내부 IMessageDecoder 확장점 | 최소 공통 헤더, Message Lifetime, IErrorSink |
 | Signal Buffer | FIFO 보유 및 인계 | 내부 ISignalBufferWriter, ISignalBufferReader | Message Lifetime, queue policy |
 | Bulletin Board | registry, 전달 대상 결정 | 내부 IBulletinBoard, IDispatcher | Workspace 등록 정보, IErrorSink |
@@ -24,7 +24,7 @@
 | DSN Mock | console echo와 Source 입력 진단 | 실제 DSN과 동일한 Source 측 입력 규약 | 공통 envelope decoder 계약 |
 | DSN 실행 호스트 | 시작 시 플러그인 로딩, 모듈 조립, Docker 실행 | 시작 설정과 플러그인 발견 규약 — 미정 | 각 모듈의 공개 인터페이스 |
 
-위 표의 세부 패키징은 제안이다. Source adapter와 Workspace 플러그인은 각 공개 계약을 구현한다. 계약 변경 시 제공자와 소비자의 호환성을 검증한다.
+위 표의 세부 패키징은 제안이다. 외부 Source는 RPC 계약을, Workspace 플러그인은 DSN 공개 계약을 구현한다. 계약 변경 시 제공자와 소비자의 호환성을 검증한다.
 
 ## 공개 범위와 의존성 규칙
 
@@ -35,7 +35,7 @@
 - Ingress와 Bulletin Board는 Admin Space의 구체 구현 대신 IErrorSink를 사용한다. Workspace는 특정 저장소 대신 IRecordStore를 사용한다.
 - Workspace의 payload 모델은 해당 플러그인이 소유한다. 다른 Workspace의 내부 모델이나 실행 결과에 직접 의존하지 않는다.
 - 인터페이스 변경 시 데이터 형식뿐 아니라 소유권, 반환 시점, 순서, 실패 및 포화 동작, 동시 호출 가능 여부를 함께 명시한다.
-- C# 공통 계약과 native Source 간에는 wire format 및 전송 계약으로 호환성을 유지한다. 동일 런타임이나 바이너리 인터페이스를 강제하지 않는다.
+- Source와 DSN 간에는 RPC 계약으로 호환성을 유지한다. 동일 런타임이나 바이너리 인터페이스를 강제하지 않는다.
 
 | 개발 대상 | 전체 시스템 없이 검증하는 경계 |
 | --- | --- |
@@ -54,30 +54,30 @@
 
 ### 1. 최소 공통 계약
 
-Envelope wire format, 최대 입력 크기, 첫 전송 경로, Source 탄창 소유권, Workspace 및 lease 인터페이스를 먼저 정한다. DSN 공통 계약과 환경별 Source API의 책임을 구분한다. payload의 업무 스키마를 공통 라이브러리에 넣지 않는다.
+Envelope wire format, 최대 입력 크기, RPC 방식, Source 전달 계약, Workspace 및 lease 인터페이스를 먼저 정한다. DSN 공통 계약과 환경별 Source API의 책임을 구분한다. payload의 업무 스키마를 공통 라이브러리에 넣지 않는다.
 
-### 2. C++ Source → Mock
+### 2. 검증 RPC client → Mock
 
-console echo로 실제 입력 규약을 검증한다. 수신기 미실행·종료·혼잡 상태에서 원 프로젝트가 대기하지 않는지 확인한다. Source 발행 비용과 탄창 동작을 함께 측정한다.
+console echo로 실제 입력 규약을 검증한다. 수신기 미실행·종료·혼잡 상태에서 원 프로젝트가 대기하지 않는지 확인한다. Source 내부 발행 비용·탄창 구현의 검증은 외부 Source 담당 범위다.
 
 ### 3. 실제 DSN의 최소 수직 경로
 
 Source → Ingress → FIFO/no_policy → Bulletin Board → 실행 구성 요소 → 시작 시 로드된 예제 Workspace → record 저장 → 최소 View 조회를 연결한다. 두 Workspace가 동일 원본을 참조하는 경로와 오류 집계를 함께 검증한다.
 
-### 4. 커널·eBPF 및 Docker 통합
+### 4. RPC와 Docker 통합
 
-지원 커널에서 발행 경로를 검증하고, 컨테이너 밖 Source와 컨테이너 안 DSN 사이의 자원 접근 및 연결 설정을 문서화한다. 정확한 mount·권한·네트워크 옵션은 전송 방식 결정 후 필요한 범위로 정한다. 원격 View 연결도 검증한다.
+host의 검증 RPC client와 container DSN을 연결하고 실제 endpoint·저장·View·종료를 검증한다. 실제 Source 연동은 해당 담당자의 준비 후 같은 RPC 계약으로 수행한다. kernel/eBPF 중계 구현을 DSN 내부 산출물로 두지 않는다.
 
-### 5. 부하 측정과 운영 정책 후속 결정
+### 5. 1차 인수 이후의 품질 평가 — 보류
 
-측정 결과를 바탕으로 용량, 스케줄러, 경고 및 심각도 기준을 정한다. 임시 기본값은 적용 범위와 선정 근거를 명시한다.
+현재는 QA 위험과 관측 아이디어만 등록한다. 상세 계측·모니터링·개선 조치는 1차 인수 이후 수행한다. 1차 구현에 필요한 초기 용량과 기본 실패 동작은 적용 범위·근거를 명시하되 운영 최적값으로 간주하지 않는다.
 
 ## 핵심 검증 기준
 
 | 영역 | 검증할 동작 |
 | --- | --- |
 | Source 호출 | 미연결, 혼잡, 수신기 종료 시에도 연결·큐 여유·응답을 기다리지 않고 실패를 호출자에게 전파하지 않음 |
-| 성능 | 발행 호출 지연 분포, CPU 부하, 처리량, 메모리 사용량, 관측 지점별 폐기 건수 기록; 수치 목표는 미정 |
+| 성능 — 1차 이후 | 지연·CPU·처리량·메모리·폐기 관측은 아이디어로 등록; 수치 목표와 상세 계측은 후속 |
 | Payload 블랙박스 | 서로 다른 임의 바이너리를 공통 계층에서 의미 해석 없이 수신·분배 |
 | Registry | Workspace 하나당 등록 이름 하나; 중복 이름의 후발 등록 거부와 ErrorSink 기록 |
 | Queue / 실행 | 기본 no_policy에서 FIFO 소비; 단일 실행 루프에서 대상 Workspace 순차 호출 |
@@ -93,4 +93,4 @@ Source → Ingress → FIFO/no_policy → Bulletin Board → 실행 구성 요�
 
 ## 초기 산출물 범위
 
-C# DSN Docker 이미지, 환경별 Source 라이브러리와 예제, DSN Mock, Workspace 공통 계약과 예제 플러그인, 기본 no_policy, 독립 오류 집계와 Admin Space, 최소 record 저장 및 View 조회 경로를 목표로 한다. 전송 방식·저장소·View API의 구체 규격은 미정이다.
+C# DSN Docker 이미지, Source 전달용 RPC 인터페이스·fixture·호출 예제, DSN Mock, Workspace 계약·예제, no_policy, 오류 집계·Admin, record 저장·View 조회를 제공한다. Source별 SDK·kernel/eBPF·중계 구현은 외부 담당 범위다.

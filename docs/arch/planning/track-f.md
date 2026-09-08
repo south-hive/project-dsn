@@ -14,74 +14,103 @@
 
 | Task | 선행 task | 산출물 |
 | --- | --- | --- |
-| [F-01: 지원 환경과 프로젝트 경계 고정](#f-01) | 없음 | 환경 matrix, 프로젝트 배치안, build 절차 |
-| [F-02: Envelope v1과 전송 경계 정의](#f-02) | [F-01](track-f.md#f-01) | wire v1, transport/session 규격, 공통 fixture |
-| [F-03: Source 발행·탄창·attach 수명 계약](#f-03) | [F-01](track-f.md#f-01) | Source API, magazine 상태 전이, teardown 계약 |
+| [F-01: DSN 환경과 프로젝트 경계 고정](#f-01) | 없음 | DSN 환경 matrix, 프로젝트 배치안, build 절차 |
+| [F-02: RPC와 Envelope v1 계약 정의](#f-02) | [F-01](track-f.md#f-01) | RPC 계약/IDL 또는 동등 규격, envelope v1, 공통 fixture |
+| [F-03: Source 전달용 RPC 인터페이스 패키지 정의](#f-03) | [F-02](track-f.md#f-02) | Source 연동 규격, RPC 인터페이스/IDL, fixture 및 호출 예시 |
 | [F-04: DSN 실행·메모리·플러그인 API 고정](#f-04) | [F-01](track-f.md#f-01) | 계약 프로젝트, 소유권 표, 대역 Workspace, 기본 오류 모델 |
 | [F-05: Record·조회·export·View 경계 정의](#f-05) | [F-01](track-f.md#f-01) | Record/저장/조회/export 규격, 예제 record·query fixture |
-| [F-06: 성능·손실 계측 계획과 목표 정의](#f-06) | [F-01](track-f.md#f-01) | 계측 계획, workload, 결과 schema 및 목표 표 |
+| [F-06: Quality Attribute·위험·관측 아이디어 정리](#f-06) | [F-01](track-f.md#f-01) | QA·위험 등록부, 관측 아이디어, 단계 구분 |
 
 <a id="f-01"></a>
-## F-01. 지원 환경과 프로젝트 경계 고정
+## F-01. DSN 환경과 프로젝트 경계 고정
 
 **상태:** 미착수
+
+**단계:** 1차 개발
 
 **선행 조건:** 없음
 
 **하위 작업**
 
-- [ ] `F-01.1` 배포판·CPU·커널·eBPF 실행 문맥 및 검증 장비 기록
-- [ ] `F-01.2` .NET·native toolchain과 프로젝트 참조 경계 선택
-- [ ] `F-01.3` 공통 build·검증 명령과 버전 고정 목록 작성
+- [ ] `F-01.1` DSN host·CPU·Docker 및 RPC 검증 환경 기록
+- [ ] `F-01.2` .NET과 DSN 공통 프로젝트·build 경계 선택
+- [ ] `F-01.3` DSN build/test 명령과 버전 고정 목록 작성
 
-**산출물:** 환경 matrix, 프로젝트 배치안, build 절차
+**산출물:** DSN 환경 matrix, 프로젝트 배치안, build 절차
 
-**완료 기준:** 각 대상의 지원/미검증 구분과 재현 환경이 명시되고 빈 프로젝트를 빌드할 수 있다.
+**완료 기준:** DSN과 Mock을 빌드할 수 있다. Source native/kernel toolchain 선정·구현은 외부 담당 범위다.
 
 **인계 증거:** 변경 위치·build/검증 명령·환경·실제 결과·남은 제약을 완료 기록에 첨부한다.
+
+
+**담당자 결정:** 확정된 RPC·모듈 계약 안의 구현 및 문서·검증 구성
+
+**협의 조건:** RPC 입력/응답 의미·Source 식별·소유권·DSN 배포 또는 공개 계약을 새로 정하거나 변경할 때
+
+**협의 대상·관련 경계:** I·H·해당 DSN 계약 소비자; RPC 외부 호환성은 Source 담당자 — DC-02, DC-10 ([결정 범위](../14-decision-boundaries.md)). 기존 계약 준수 시 재협의 없이 진행한다.
 
 <a id="f-02"></a>
-## F-02. Envelope v1과 전송 경계 정의
+## F-02. RPC와 Envelope v1 계약 정의
 
 **상태:** 미착수
+
+**단계:** 1차 개발
 
 **선행 조건:** F-01
 
 **하위 작업**
 
-- [ ] `F-02.1` 최소 헤더·version·framing·길이·encoding·time 표현 및 오류 규칙 정의
-- [ ] `F-02.2` 동일 호스트 전송·container 접근·session/source_id 매핑 선택
-- [ ] `F-02.3` 정상·손상·미지원 버전의 언어 중립 byte fixture 작성
+- [ ] `F-02.1` RPC 방식·서비스/메서드·요청 schema 및 envelope version 표현 정의
+- [ ] `F-02.2` 최대 요청 크기·호환성·RPC session/source_id 매핑·Docker endpoint 정의
+- [ ] `F-02.3` 정상·잘못된 요청 fixture와 RPC 응답/상태의 의미 정의
 
-**산출물:** wire v1, transport/session 규격, 공통 fixture
+**산출물:** RPC 계약/IDL 또는 동등 규격, envelope v1, 공통 fixture
 
-**완료 기준:** C++ encoder와 C# decoder가 동일 bytes와 기대 결과를 공유하며 frame 및 연결 종료 시 소유권을 구분한다.
+**완료 기준:** Source와 DSN/Mock이 동일 RPC 계약을 사용한다. RPC 방식은 선택 전이며 업무 ACK/NACK과 재전송 보장을 추가하지 않는다.
 
 **인계 증거:** 변경 위치·build/검증 명령·환경·실제 결과·남은 제약을 완료 기록에 첨부한다.
+
+
+**담당자 결정:** 확정된 RPC·모듈 계약 안의 구현 및 문서·검증 구성
+
+**협의 조건:** RPC 입력/응답 의미·Source 식별·소유권·DSN 배포 또는 공개 계약을 새로 정하거나 변경할 때
+
+**협의 대상·관련 경계:** I·H·해당 DSN 계약 소비자; RPC 외부 호환성은 Source 담당자 — DC-02, DC-10 ([결정 범위](../14-decision-boundaries.md)). 기존 계약 준수 시 재협의 없이 진행한다.
 
 <a id="f-03"></a>
-## F-03. Source 발행·탄창·attach 수명 계약
+## F-03. Source 전달용 RPC 인터페이스 패키지 정의
 
 **상태:** 미착수
 
-**선행 조건:** F-01
+**단계:** 1차 개발
+
+**선행 조건:** F-02
 
 **하위 작업**
 
-- [ ] `F-03.1` 준비 API와 Publish 비용 경계 및 producer 동시성 정의
-- [ ] `F-03.2` 탄창 용량·슬롯 소유권·포화 폐기·미연결 동작 정의
-- [ ] `F-03.3` attach/detach·재접속·SDK 종료와 활성 접근 정리 규칙 정의
+- [ ] `F-03.1` RPC 호출 계약과 envelope/payload 경계를 전달 문서로 정리
+- [ ] `F-03.2` 발행 비대기·실패 비전파·손실 허용의 연동 요구 명시
+- [ ] `F-03.3` Mock endpoint·정상/오류 fixture·호출 예시 및 책임 경계 제공
 
-**산출물:** Source API, magazine 상태 전이, teardown 계약
+**산출물:** Source 연동 규격, RPC 인터페이스/IDL, fixture 및 호출 예시
 
-**완료 기준:** 발행 비대기·오류 전파 금지·반환 후 데이터 수명·detach 중 발행 및 해제 조건이 검증 가능하게 정의된다.
+**완료 기준:** 각 Source 담당자가 내부 구현을 선택할 수 있는 RPC 계약을 제공한다. 탄창·ABI·thread·kernel/eBPF·중계 구현을 DSN에서 지정하지 않는다.
 
 **인계 증거:** 변경 위치·build/검증 명령·환경·실제 결과·남은 제약을 완료 기록에 첨부한다.
+
+
+**담당자 결정:** 확정된 RPC·모듈 계약 안의 구현 및 문서·검증 구성
+
+**협의 조건:** RPC 입력/응답 의미·Source 식별·소유권·DSN 배포 또는 공개 계약을 새로 정하거나 변경할 때
+
+**협의 대상·관련 경계:** I·H·해당 DSN 계약 소비자; RPC 외부 호환성은 Source 담당자 — DC-02, DC-10 ([결정 범위](../14-decision-boundaries.md)). 기존 계약 준수 시 재협의 없이 진행한다.
 
 <a id="f-04"></a>
 ## F-04. DSN 실행·메모리·플러그인 API 고정
 
 **상태:** 미착수
+
+**단계:** 1차 개발
 
 **선행 조건:** F-01
 
@@ -97,10 +126,20 @@
 
 **인계 증거:** 변경 위치·build/검증 명령·환경·실제 결과·남은 제약을 완료 기록에 첨부한다.
 
+**개발 계약 보완:** GAP-04·05·09: Process 반환·유효하지 않은 lease·대상 실패 규칙, Queue/Lifetime 초기 한도와 ErrorEvent 필드를 명시한다. [점검 목록](../12-engineering-readiness.md)
+
+**담당자 결정:** 공통 타입·반납 ledger·API 예제 초안 작성
+
+**협의 조건:** 공개 계약·root/lease 인계·Process·대상 실패·오류 모델을 정할 때
+
+**협의 대상·관련 경계:** R의 해당 모듈 담당과 I; 오류 E, lifecycle H, plugin 소비자 A — DC-04, DC-05, DC-08 ([결정 범위](../14-decision-boundaries.md)). 기존 계약 준수 시 재협의 없이 진행한다.
+
 <a id="f-05"></a>
 ## F-05. Record·조회·export·View 경계 정의
 
 **상태:** 미착수
+
+**단계:** 1차 개발
 
 **선행 조건:** F-01
 
@@ -116,21 +155,37 @@
 
 **인계 증거:** 변경 위치·build/검증 명령·환경·실제 결과·남은 제약을 완료 기록에 첨부한다.
 
+**개발 계약 보완:** GAP-06·07·08: Append 접수/영속·중복 쓰기·조회 가시성·취소, field 타입/null/schema와 View field 목록 계약을 명시한다. [점검 목록](../12-engineering-readiness.md)
+
+**담당자 결정:** record/query/fixture의 후보 작성
+
+**협의 조건:** field·Append 반환·query 가시성·취소·export·View 조합 의미를 정할 때
+
+**협의 대상·관련 경계:** P와 해당 소비자 R·A·V; 종료 영향 시 H — DC-06, DC-07 ([결정 범위](../14-decision-boundaries.md)). 기존 계약 준수 시 재협의 없이 진행한다.
+
 <a id="f-06"></a>
-## F-06. 성능·손실 계측 계획과 목표 정의
+## F-06. Quality Attribute·위험·관측 아이디어 정리
 
 **상태:** 미착수
+
+**단계:** 1차 개발
 
 **선행 조건:** F-01
 
 **하위 작업**
 
-- [ ] `F-06.1` 발행 지연·CPU·원본 보유·수신량·손실 측정 지점 정의
-- [ ] `F-06.2` 정상·burst·미연결·느린 저장·다중 Source workload 작성
-- [ ] `F-06.3` 환경별 수치 목표 또는 목표 미정 상태와 baseline 형식 정의
+- [ ] `F-06.1` 기존 설계의 Quality Attribute와 위험 시나리오 정리
+- [ ] `F-06.2` 관측 가능한 위치·지표 후보와 관측 한계 기록
+- [ ] `F-06.3` 1차 기능 검증과 후속 monitoring·평가·조치의 범위 구분
 
-**산출물:** 계측 계획, workload, 결과 schema 및 목표 표
+**산출물:** QA·위험 등록부, 관측 아이디어, 단계 구분
 
-**완료 기준:** 발행과 수신 건수 및 clock 기준을 구분하며 수치 목표가 없는 항목을 미정으로 표시한다.
+**완료 기준:** 위험을 구현 결함과 구분하여 미평가 상태로 기록한다. 수치 목표·도구·수집 주기·상세 구현은 확정하지 않는다.
 
 **인계 증거:** 변경 위치·build/검증 명령·환경·실제 결과·남은 제약을 완료 기록에 첨부한다.
+
+**담당자 결정:** QA·위험·관측 후보를 미평가 초안으로 기록
+
+**협의 조건:** 다른 모듈의 기대 응답·관측 범위 또는 단계 구분을 기술할 때
+
+**협의 대상·관련 경계:** 해당 위험의 모듈 담당과 E·X — DC-11 ([결정 범위](../14-decision-boundaries.md)). 기존 계약 준수 시 재협의 없이 진행한다.

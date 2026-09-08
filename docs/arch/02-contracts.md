@@ -12,7 +12,7 @@
 | `workspace[]` | 수신할 Workspace의 등록 이름 배열 |
 | `payload` | Source와 Workspace 사이에서만 형식과 의미를 아는 불투명 바이트 |
 
-Transport Adapter는 연결·수신·연결 종료를 담당한다. 버전 선택기는 최소 공통 헤더에서 version을 읽어 해당 Decoder를 선택한다. 최소 공통 헤더의 바이너리 규약은 미정이다. 버전별 Decoder는 공통 메시지 표현을 제공하며 envelope 구조, payload 경계 및 길이 같은 구조적 조건을 확인한다. payload 내용의 스키마 검증이나 의미 해석은 하지 않는다. 빈 payload 허용 여부, 크기 제한, 문자열 인코딩, 시간 표현, framing은 별도 확정이 필요하다.
+RPC Server Adapter는 RPC 요청 수신·session·호출 종료를 담당한다. Source 내부 구현은 외부 책임이다. 버전 선택기는 최소 공통 헤더에서 version을 읽어 해당 Decoder를 선택한다. 최소 공통 헤더의 바이너리 규약은 미정이다. 버전별 Decoder는 공통 메시지 표현을 제공하며 envelope 구조, payload 경계 및 길이 같은 구조적 조건을 확인한다. payload 내용의 스키마 검증이나 의미 해석은 하지 않는다. 빈 payload 허용 여부, 크기 제한, 문자열 인코딩, 시간 표현, framing은 별도 확정이 필요하다.
 
 Source의 시계가 서로 다를 수 있다. 생성 시각으로 전역 순서를 보장하거나, 시계 기준 확인 없이 Source 생성 시각과 DSN 처리 시각의 차이를 정확한 전송 지연으로 간주하지 않는다.
 
@@ -22,8 +22,8 @@ Source의 시계가 서로 다를 수 있다. 생성 시각으로 전역 순서�
 
 | 계약 | 소유 영역 | 범위와 책임 |
 | --- | --- | --- |
-| `IMessageBuilder`, `IEventPublisher` | Source | 환경별 공개 API; 메시지 준비와 탄창 적재 |
-| Transport Adapter 계약 — 이름 미정 | Ingress | DSN 내부 전송 확장점; 연결·수신·종료 |
+| Source 내부 API — 외부 | Source 담당 | IMessageBuilder/IEventPublisher는 개념적 역할이며 DSN 제공 SDK 계약이 아님 |
+| RPC 연동 계약 — 이름 미정 | Source / Ingress | 외부 공개 서비스·요청·호환성 계약; 세부 RPC 방식 미정 |
 | `ISink`, `IMessageDecoder` | Ingress | 내부 입력 및 버전별 decoder 확장점; Workspace에는 노출하지 않음 |
 | `ISignalBufferWriter`, `ISignalBufferReader` | Queue | DSN 내부 보유권 인계와 FIFO 소비; 외부 플러그인의 직접 접근 없음 |
 | `IQueuePolicy` — 제안 이름 | Queue | 내부 정책 확장점; 기본 `no_policy` |

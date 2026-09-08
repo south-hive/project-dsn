@@ -2,7 +2,9 @@
 
 ## 설계 상태
 
-아래는 구현을 위한 타입·연산 초안이다. 실제 C# 시그니처, native ABI, 동기·비동기 반환 타입과 구체 오류 타입은 F-02–F-05에서 고정한다. `Try*`의 실패 결과는 DSN 내부 제어용이며 Source 호출자에 대한 no error 계약과 구별한다. 추가 내부 인터페이스 이름은 아직 확정된 SDK 이름이 아니다.
+Source–DSN은 RPC 계약을 사용한다. Source 내부 타입·API는 이 문서의 구현 대상이 아니다. RPC의 응답·상태는 업무 처리 ACK/NACK과 구분하며 상세 방식은 F-02에서 정의한다.
+
+아래는 구현을 위한 타입·연산 초안이다. 실제 C# 시그니처, RPC IDL, 동기·비동기 반환 타입과 구체 오류 타입은 F-02–F-05에서 고정한다. `Try*`의 실패 결과는 DSN 내부 제어용이며 Source 호출자에 대한 no error 계약과 구별한다. 추가 내부 인터페이스 이름은 아직 확정된 SDK 이름이 아니다.
 
 ## CLS-01. 메시지와 참조 수명
 
@@ -164,7 +166,7 @@ flowchart LR
         BB["IBulletinBoard / IDispatcher"]
         EX["IWorkspaceExecutor"]
         ML["IMessageLifetime / Allocation"]
-        TP["ITransportAdapter / ISink"]
+        TP["RPC Contract / ISink"]
         DC["IMessageDecoder"]
     end
     Exec -.-> QR
@@ -189,7 +191,7 @@ flowchart LR
 
 | ID / 연산 | 제공자 → 소비자 | 입력·출력과 소유권 | 순서·실패·동시성 |
 | --- | --- | --- | --- |
-| IF-S01 `Publish(prepared)` | Source SDK → 원 프로젝트 | 준비된 데이터 적재 시도; 반환 후 원본 메모리 유효성은 SDK 규격에 명시 | 외부 반환은 완료 통지만 의미; 송신 보장 없음; 적재 불가 시 폐기 |
+| IF-S01 외부 Source 발행 | Source 담당 → 원 프로젝트 | 내부 API·ABI·탄창·메모리 수명은 외부 담당 | 발행 비대기·오류 비전파·손실 허용 요구 유지; DSN 제공 API가 아님 |
 | IF-T01 `Attach/Detach` | 전송 adapter → sender/Host | session 자원 수명 관리 | 발행 호출 밖에서 수행; 메시지 ACK/NACK 없음; 원격 전달 성공을 뜻하지 않음 |
 | IF-T02 `Receive(frame, session)` | Transport → Ingress sink | 수신 frame 수명과 인계 시점 명시 | 부분 frame·연결 종료 처리는 F-02 규격에 따름 |
 | IF-D01 `TryDecode(frame)` | Protocol → Ingress/Mock | 검증된 envelope와 payload 범위 또는 내부 진단 결과 | 공통 헤더보다 짧은 입력, 미지원 버전, 잘못된 범위 검사; payload 해석 없음 |

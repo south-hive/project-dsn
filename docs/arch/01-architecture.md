@@ -2,11 +2,13 @@
 
 ## 시스템 범위와 우선순위
 
-DSN은 C#으로 구현하며 Docker 이미지로 배포한다. Source는 원 프로젝트의 언어와 실행 환경에 맞는 라이브러리 형태로 제공한다. 현재 대상은 CentOS 9의 C++ 앱과 Linux 커널 드라이버이며, 드라이버에서 eBPF로 발행하는 경로도 포함한다.
+DSN은 C#으로 구현하며 Docker 이미지로 배포한다. Source 구현은 각 Source 담당자의 책임이다. DSN은 Source에 RPC 연동 인터페이스를 제공한다. 현재 대상은 CentOS 9의 C++ 앱과 Linux 커널 드라이버이며, 드라이버에서 eBPF로 발행하는 경로도 포함한다.
 
 Source 호출자의 지연과 CPU 부담을 최소화하는 것이 전달 보장보다 우선이다. 발행은 내부 fire gun의 탄창에 메시지를 적재하는 것으로 끝낸다. 연결과 실제 전송은 별도 실행 흐름이 담당한다. 발행 호출은 대기하지 않으며, 실패를 오류나 예외로 호출자에게 전파하지 않는다. 메시지 손실을 허용하고 ACK/NACK을 요구하지 않는다.
 
 payload는 DSN 공통 계층에 블랙박스다. Source와 Workspace가 인코딩과 스키마를 합의하며, Workspace가 payload를 해석한다. 이상 발생 이력 확인과 TC 진행 상황 조회는 사용 예시이고 시스템의 지원 범위를 제한하지 않는다.
+
+Source–DSN 경계는 우선 RPC로 한정한다. RPC framework와 호출 형태는 미정이다. Source 내부 구현은 외부 책임이며 DSN은 RPC 수신부터 내부 처리를 담당한다.
 
 모듈 간 의존성은 공개 인터페이스로 제한한다. 각 계약은 데이터 소유권, 수명, 순서 및 실패 동작을 정의한다. 모듈별 제공·소비 인터페이스는 [모듈 경계와 검증](04-delivery.md)에 명시한다.
 
@@ -18,12 +20,12 @@ flowchart LR
         subgraph Outside[Docker 밖]
             App[C++ 앱 / Source 라이브러리]
             Driver[Linux 커널 드라이버 / eBPF 발행 경로]
-            Transport[발행 버퍼 및 전송 경로]
+            Transport[외부 Source 구현 / RPC 호출]
             App --> Transport
             Driver --> Transport
         end
         subgraph Container[Docker 안 / C# DSN]
-            Ingress[Transport Adapter]
+            Ingress[RPC Server Adapter]
             Decoder[버전 선택 / Envelope Decoder]
             Buffer[Signal Buffer]
             Board[Bulletin Board]
@@ -53,15 +55,15 @@ flowchart LR
     Remote[원격 사용자 / View 클라이언트] --> View
 ```
 
-이 그림은 논리적 경계를 나타낸다. 실제 전송 기술, 커널과 사용자 공간 사이의 중계 방식, 저장소의 프로세스 및 배치 위치는 미정이다. 원격 연결은 View를 기준으로 하며, 원격 Source 지원을 첫 구현의 전제로 두지 않는다.
+이 그림은 논리적 경계를 나타낸다. RPC 세부 기술과 저장소 배치는 미정이며, 커널/사용자 공간 중계는 Source 담당자가 결정한다. 원격 연결은 View를 기준으로 하며, 원격 Source 지원을 첫 구현의 전제로 두지 않는다.
 
 ## 구성 요소
 
 | 구성 요소 | 책임 |
 | --- | --- |
-| Source / Message Builder | 환경에 맞는 API로 envelope과 payload를 구성 |
-| Source / Fire Gun | 메시지를 탄창에 적재하고 호출자에게 즉시 반환; 실제 전송 실행 흐름과 분리 |
-| Transport Adapter | 연결·수신·연결 종료 등 환경별 전송 처리 |
+| Source / Message Builder — 외부 | Source 담당자가 내부 API·메시지 준비 방식을 결정 |
+| Source / Fire Gun — 외부 | 발행 비대기·실패 비전파 계약 구현; 내부 구조는 Source 담당 범위 |
+| RPC Server Adapter | RPC 요청·session·종료와 DSN 내부 입력 인계 |
 | Envelope Decoder | 최소 공통 헤더에서 버전 선택, 버전별 구조 검증 및 공통 메시지 표현 제공 |
 | Signal Buffer | 수신한 메시지를 보유하고 기본 FIFO 순서로 제공 |
 | Bulletin Board | Workspace registry와 전달 대상 결정; 수신 큐·dispatcher는 내부 계약 |
@@ -90,6 +92,6 @@ Message Lifetime은 Bulletin Board와 분리한다. Workspace는 Checkout한 참
 
 DSN은 논리적으로 수신량의 상한을 두지 않고 지속적으로 수신을 시도한다. 실제 자원의 수용 한계를 초과하면 메시지를 폐기하고 IErrorSink로 Admin Space에 오류를 남긴다. 버퍼와 메모리의 물리적 한도는 별도로 설정한다.
 
-Source의 탄창은 넉넉하게 마련하되, 적재할 수 없으면 대기하거나 호출자에게 실패를 전파하지 않는다. 용량과 구체적 폐기 선택은 미정이다. DSN이 관측하지 못한 Source 내부 손실을 DSN의 ErrorSink가 자동으로 기록할 수 있다고 가정하지 않는다.
+Source의 탄창은 넉넉하게 마련하되, 적재할 수 없으면 대기하거나 호출자에게 실패를 전파하지 않는다. Source 내부 용량과 구현 선택은 Source 담당자가 정한다. DSN이 관측하지 못한 Source 내부 손실을 DSN의 ErrorSink가 자동으로 기록할 수 있다고 가정하지 않는다.
 
-`source_id`별 단위 시간당 메시지 수를 관측하고, 추후 Admin Space에 경고를 남길 수 있게 한다. 필요하면 폐기 정책을 적용할 수 있다. 측정 주기, 임계값, 폐기 조건은 운영 중 결정한다.
+`source_id`별 단위 시간당 메시지 수를 관측하고, 추후 Admin Space에 경고를 남길 수 있게 한다. 필요하면 폐기 정책을 적용할 수 있다. 관측 후보는 QA 등록부에 기록하며 상세 monitoring 구현·측정 주기·임계값·운영 조치는 1차 완료 이후에 결정한다.

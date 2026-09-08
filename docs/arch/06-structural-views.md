@@ -2,7 +2,7 @@
 
 ## 표기와 설계 상태
 
-필수 동작은 [설계 기준 D01–D25](05-decisions.md)를 따른다. 아래 패키지·클래스 이름과 내부 배치는 **구현 설계안**이다. 패키지는 논리 모듈이며 각각 별도 프로세스나 배포 단위를 뜻하지 않는다. 화살표 의미는 각 그림에서 정의한다.
+필수 동작은 [설계 기준 D01–D26](05-decisions.md)를 따른다. 아래 패키지·클래스 이름과 내부 배치는 **구현 설계안**이다. Source 내부는 외부 담당 범위이며 DSN 공통 경계는 RPC다. 패키지는 논리 모듈이며 각각 별도 프로세스나 배포 단위를 뜻하지 않는다. 화살표 의미는 각 그림에서 정의한다.
 
 ## SYS-01. 전체 시스템
 
@@ -10,11 +10,11 @@
 
 ```mermaid
 flowchart TB
-    App["C++ Application"] --> SDK["Source SDK / Fire Gun"]
+    App["C++ Application"] --> SDK["외부 Source 구현"]
     Kernel["Kernel Driver / eBPF"] --> KA["Kernel 발행 경로"]
-    SDK --> Sender["탄창 소비 / 전송 실행 흐름"]
-    KA --> Bridge["환경별 전송 또는 사용자 공간 중계"]
-    Sender --> TA["DSN Transport Adapter"]
+    SDK --> Sender["외부 RPC 호출 경로"]
+    KA --> Bridge["외부 RPC 호출 경로"]
+    Sender --> TA["DSN RPC Server Adapter"]
     Bridge --> TA
     TA --> DEC["Version Selector / Envelope Decoder"]
     DEC --> Q["Signal Buffer / no_policy"]
@@ -80,34 +80,25 @@ flowchart LR
 
 `Dsn.Runtime.Contracts`는 DSN 내부 모듈 사이의 계약 패키지다. C#에서 다른 assembly가 참조할 수 있다는 사실과 외부 플러그인에 지원하는 API인지는 구분한다. Workspace 프로젝트의 참조 목록에 Runtime·Ingress·Execution 구현을 포함하지 않는 검증을 둔다. 인터페이스별 제공자·소비자는 [IF-01](07-types-and-interfaces.md)에 정의한다.
 
-Native Source는 C# assembly를 참조하지 않는다. 별도 SDK와 wire format 규격 및 공통 입력 fixture로 상호 운용한다. 실제 프로젝트 디렉터리와 assembly 분할은 작업 F-01에서 고정한다.
+외부 Source는 RPC 규격과 공통 입력 fixture로 상호 운용한다. DSN은 Source SDK 내부 구현을 제공하지 않는다. 실제 프로젝트 디렉터리와 assembly 분할은 작업 F-01에서 고정한다.
 
-## CMP-01. Source와 전송
+## CMP-01. 외부 Source와 RPC 경계
 
 ```mermaid
 flowchart LR
-    Caller["원 프로젝트 호출자"] --> Builder["Message Preparation API"]
-    Builder --> Gun["Fire Gun / Publish"]
-    Gun --> Mag["Local Magazine"]
-    Sender["Sender Loop"] -->|"소비"| Mag
-    Sender --> Attach["Attach / Detach / Reconnect"]
-    Sender --> Encode["Envelope Encoder"]
-    Encode --> Tx["Transport Sender"]
-    Attach --> Tx
-    Tx --> Dest["DSN 또는 Mock"]
-    Gun -->|"적재 실패"| Drop["Local Drop Counter"]
+    Caller["원 프로젝트 / Source 담당 구현"] --> Client["외부 RPC 호출 구현"]
+    Contract["DSN 제공 RPC 계약 / Envelope"] -.-> Client
+    Client --> Server["DSN RPC Server Adapter"]
+    Client --> Mock["RPC Console Mock"]
 ```
 
-- `Publish`의 외부 계약은 탄창 적재 시도로 끝난다. 탄창 내부의 성공·실패 결과는 호출자에게 오류로 노출하지 않는다.
-- Encoder가 호출 경로와 전송 경로 중 어디에 위치할지는 F-03에서 결정한다. 위 그림은 전송 경로에서 encoding하는 안이다.
-- Builder가 만든 데이터의 수명, 슬롯의 소유권, producer 동시성은 SDK 계약에 포함한다. Source 전체 zero-copy는 확정 사항이 아니다.
-- Attach·Detach는 전송 실행 흐름의 상태 전환이다. 메시지별 ACK/NACK이 아니다.
+Source의 언어별 API·탄창·sender·kernel/eBPF·중계·메모리 수명은 Source 담당자가 결정한다. DSN은 RPC 계약과 Mock을 제공한다. 두 endpoint는 대체 목적지다. RPC framework와 호출 형태는 F-02에서 정한다.
 
 ## CMP-02. Ingress와 Queue
 
 ```mermaid
 flowchart LR
-    TA["Transport Adapter"] --> RX["수신 Frame / Session Context"]
+    TA["RPC Server Adapter"] --> RX["수신 Frame / Session Context"]
     RX --> VS["Minimum Header / Version Selector"]
     VS --> D1["Envelope Decoder v1"]
     VS -. "향후" .-> DN["Envelope Decoder vN"]
@@ -172,7 +163,7 @@ View는 field 선택·조합 정의를 소유한다. 실제 query 실행을 저�
 
 ```mermaid
 flowchart LR
-    Source["Source Sender"] --> Transport["실제 DSN과 같은 Transport Adapter"]
+    Source["Source Sender"] --> Transport["실제 DSN과 같은 RPC Server Adapter"]
     Transport --> Decoder["공유 Version Selector / Decoder"]
     Decoder --> Echo["Echo Formatter"]
     Echo --> Output["제한된 Console Output Buffer"]
