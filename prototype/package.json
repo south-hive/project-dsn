@@ -1,0 +1,22 @@
+{
+  "name": "dsn-practice",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "verify": "node --test --test-reporter=tap dist/test/verification.test.js",
+    "validate": "node --test --test-reporter=tap dist/test/validation.test.js",
+    "check": "npm run build && npm run verify && npm run validate",
+    "start": "node dist/src/cli.js",
+    "mock": "node dist/src/cli.js --mock",
+    "demo": "node dist/src/demo.js"
+  },
+  "devDependencies": {
+    "@types/node": "26.5.0",
+    "typescript": "5.9.3"
+  }
+}

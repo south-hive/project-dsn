@@ -1,1 +1,5 @@
 /requirement/
+**/node_modules/
+**/dist/
+/prototype/reports/*.tap
+/prototype/reports/*.json
