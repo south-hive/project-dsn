@@ -1,5 +1,7 @@
 # practice Verification / Validation 결과
 
+이 문서는 최초 32건 검증의 과거 기록이다. 추가 경계·복구 시험 및 결함 수정 이후 결과는 [tests 최신 보고서](../../tests/report.md)를 기준으로 확인한다.
+
 실행일: 2026-09-08. 대상: `practice` 브랜치의 `prototype/`. 설계 기준: [계약](../../docs/arch/02-contracts.md), [Source 경계](../../docs/arch/03-source-and-mock.md), [검증 계획](../../docs/arch/11-verification.md). 이 문서의 상대 경로는 저장소 내 실제 파일을 가리킨다.
 
 ## 판정

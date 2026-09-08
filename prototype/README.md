@@ -99,3 +99,5 @@ Admin stub은 시작, 테스트용 `Drain`, 정상 종료에서 집계 snapshot�
 메모리 저장은 재시작 시 사라진다. View는 field 선택만 지원하며 사용자 인증·권한·저장된 View 정의·join은 stub 범위 밖이다. C# 프로젝트, Docker 이미지, native Source, kernel/eBPF, 운영 계측은 포함하지 않는다. Production task 완료 판정에 이 결과를 그대로 사용하지 않는다.
 
 상세 규약은 [RPC 계약](docs/protocol.md), 검증 결과와 요구사항 추적은 [V&V 보고서](docs/validation-report.md)를 참고한다.
+
+추가 경계·복구 시험과 반복 실행은 [tests 안내](../tests/README.md), 최신 판정은 [테스트 결과](../tests/report.md)를 참고한다.
