@@ -1,5 +1,7 @@
 # Quality Attribute와 설계 위험 등록부
 
+> 상세 설계 참조입니다. 처음 읽는 부서원은 [전체 → 기능 → 담당 작업 안내](../development/README.md)에서 시작하세요. 아래 초기 설계의 미정/제안과 현재 구현 선택은 [구현 계약](../implementation/contracts.md)을 함께 확인합니다.
+
 ## 상태와 적용 범위
 
 RISK-01 등 Source 내부 위험의 구현·검증 주체는 외부 Source 담당자다. DSN은 RPC 경계에서 관측 가능한 현상과 요구 동작을 전달하며 Source 내부 계측·개선 작업을 수행하지 않는다. RISK-04의 중계 구현도 외부 책임이고 RPC session 매핑은 공동 계약이다.

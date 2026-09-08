@@ -1,0 +1,8 @@
+.git
+requirement
+prototype
+**/bin
+**/obj
+**/node_modules
+data
+tests/results

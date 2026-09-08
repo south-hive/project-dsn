@@ -1,5 +1,7 @@
 # 모듈 경계와 검증
 
+> 상세 설계 참조입니다. 처음 읽는 부서원은 [전체 → 기능 → 담당 작업 안내](../development/README.md)에서 시작하세요. 아래 초기 설계의 미정/제안과 현재 구현 선택은 [구현 계약](../implementation/contracts.md)을 함께 확인합니다.
+
 상세 구조는 [구조 다이어그램](06-structural-views.md), 구현 작업의 선행 조건과 산출물은 [Task·Track 계획](10-implementation-plan.md)을 기준으로 한다. 아래 통합 순서는 요약이며 track별 병렬 진행을 제한하지 않는다.
 
 ## 모듈별 인터페이스
