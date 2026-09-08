@@ -18,10 +18,17 @@
 | D12 | 이름은 조직 내부에서 관리한다. 중복 이름의 후발 등록은 거부하고 IErrorSink에 기록한다. |
 | D13 | payload는 공통 계층에서 블랙박스인 바이트이며 Source와 Workspace가 의미를 합의한다. |
 | D14 | DSN 내부 메시지 원본은 하나다. Workspace는 읽기 전용 공유 참조를 사용하며 ref count 0에서 회수한다. 필요한 파싱 결과만 복사할 수 있다. |
-| D15 | Workspace는 서로 의존하지 않는다. 독립 스레드나 병렬 실행은 필수 조건이 아니다. CPU 부하를 줄이는 실행 방식을 선택한다. |
+| D15 | Workspace 간 처리 의존성은 없다. 초기 실행은 단일 FIFO 실행 루프에서 대상 Workspace를 순차 호출한다. 실행 방식은 교체 가능한 내부 인터페이스로 분리한다. |
 | D16 | 기본 순서는 FIFO다. queue policy 인터페이스를 두고 no_policy를 기본으로 하며 reordering은 추후 확장한다. |
 | D17 | Source 개발자를 위한 간단한 console echo DSN Mock을 제공한다. |
 | D18 | 모듈 간 의존성은 공개 인터페이스로 제한하고 데이터 소유권, 수명, 순서 및 실패 동작을 계약으로 정의한다. |
+| D19 | Message Lifetime이 원본 버퍼·ref count·회수를 소유하며 Bulletin Board에서 분리한다. |
+| D20 | 참조 획득·반납은 명시적 Checkout·Checkin으로 수행한다. 파싱·필요 데이터 복사 직후 반납하여 보유 시간을 최소화한다. |
+| D21 | 오류 접수·집계는 Admin Space와 분리한다. Admin Space는 관리용 record 변환을 담당하며 저장·View·cache 역할을 겸하지 않는다. |
+| D22 | Transport Adapter의 연결·수신·종료와 버전별 Envelope Decoder의 검증을 분리한다. |
+| D23 | Bulletin Board는 전달 대상을 결정한다. 실행 구성 요소는 호출·실패 처리·참조 반납 보장을 담당하며 queue policy와 분리한다. |
+| D24 | Persistence는 record 저장·조회·export를 담당한다. View는 조회 인터페이스로 사용자별 field 선택·조합을 제공하고 Workspace를 직접 조회하지 않는다. |
+| D25 | Workspace에는 등록·처리, 메시지 참조, record 저장 및 필요한 진단 계약만 공개한다. 큐·dispatcher·registry 변경·원본 할당과 강제 회수는 DSN 내부로 제한한다. |
 
 ## 구현 전 우선 결정할 사항
 
@@ -29,7 +36,7 @@
 | --- | --- |
 | 정확한 OS·커널·eBPF 실행 환경 | Source API와 중계 경로의 실현 가능성 확인 |
 | Source–DSN 전송 기술 및 컨테이너 연결 방식 | SDK·실제 Ingress·Mock의 동일 입력 계약 수립 |
-| Envelope 직렬화와 framing | 언어가 다른 Source와 C# DSN의 상호 운용 |
+| Envelope 직렬화, 버전 선택용 최소 공통 헤더와 framing | 언어가 다른 Source와 C# DSN의 상호 운용 |
 | 최대 메시지 크기, 빈 payload 및 잘못된 필드 처리 | decoder와 버퍼의 구조적 유효성 정의 |
 | Source 탄창 소유권, 준비 API, 용량 | 호출 반환 후 데이터 수명과 메모리 사용량 정의 |
 | 버퍼 구조와 복수 큐 병합 | producer 동시성과 FIFO 범위 구체화 |
@@ -42,7 +49,7 @@
 
 - Source별 관측 시간 단위, 경고 임계값, 선택적 폐기 조건.
 - 오류 심각도 판정, 연결 해제 조건, 재접속 간격.
-- Workspace 스케줄링과 느린 소비자의 격리 방식.
+- 기본 순차 실행의 측정 결과에 따른 스케줄링 변경과 느린 소비자 격리.
 - 부하에 맞는 버퍼 용량과 구체적 폐기 선택.
 - 오류 집계의 보존 기간과 용량 제한, 기록 불가 시 fallback.
 - 메시지 장기 참조 보유의 감지와 대응.
@@ -50,9 +57,37 @@
 
 ## 검토 중인 설계안
 
-- `IQueuePolicy`라는 구체 인터페이스 이름, lease의 단계별 인계 방식.
-- ErrorSink의 독립 접수·집계 경로와 내부 오류 표현.
+- `IQueuePolicy`와 실행 구성 요소 등 구체 인터페이스 이름 및 시그니처.
+- Checkout·Checkin 처리 문맥, 호출 종료 시 미반납 참조 정리와 중복 반납 방지의 구체 API.
+- 오류 본문의 구체 필드 및 접수·집계 구현.
 - Mock의 hex 출력, 출력 길이 제한, 출력 큐와 C# console 패키징.
 - 세부 패키징, 통합 단계 및 최소 예제의 세부 구현.
 - 실행 중 Workspace hot reload는 초기 설계 범위에 포함하지 않는 방향. 시작 시 동적 로딩과는 별도 요구다.
 
+
+## Admin Workspace 구현 시 결정할 사항
+
+- 관리 이벤트의 envelope·payload 형식과 전달 경로.
+- 원본 메시지를 관리 payload에 포함할지 여부.
+- 원본 첨부 시 복사·참조 방식과 수명.
+- 첨부 원본의 동일성 비교 범위 및 대표 사례 보존.
+- 집계 결과 전달 주기·갱신 방식과 Admin 처리 실패 대응.
+
+Admin 메시지의 중첩 envelope 구조와 원본 첨부는 현재 계약에 포함하지 않는다.
+
+## 미정 사항의 구현 task 연결
+
+| 결정 영역 | 결정 task |
+| --- | --- |
+| 환경·toolchain·패키지 배치 | [F-01](planning/track-f.md#f-01) |
+| wire format·최소 헤더·transport·session 매핑 | [F-02](planning/track-f.md#f-02) |
+| Source 준비·탄창 소유권·detach·재접속 | [F-03](planning/track-f.md#f-03) |
+| 실제 공개 API·Checkout·Checkin·대상/실패 규칙 | [F-04](planning/track-f.md#f-04) |
+| record·query·export·View 조합 의미 | [F-05](planning/track-f.md#f-05) |
+| 성능 workload·계측 목표 | [F-06](planning/track-f.md#f-06) |
+| Admin 전달·첨부·동일성·갱신 | [A-01](planning/track-a.md#a-01) |
+| 실제 저장소 | [P-02](planning/track-p.md#p-02) |
+| 사용자 View API·정의 보존·접근 범위 | [V-01](planning/track-v.md#v-01) |
+| plugin 발견·호환성·시작·종료 정책 | [H-01](planning/track-h.md#h-01) |
+
+운영 임계값과 재정렬·Workspace 격리는 구현 인터페이스를 마련한 뒤 측정 결과에 따라 결정한다. Admin 상세 결정은 해당 Workspace 구현 시 수행하며 초기 Source→Mock 경로의 선행 조건이 아니다.

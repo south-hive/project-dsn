@@ -1,0 +1,526 @@
+{
+  "schema_version": 1,
+  "status_note": "Implementation tasks are planned; documentation does not complete implementation tasks.",
+  "tasks": [
+    {
+      "id": "F-01",
+      "track": "F",
+      "title": "지원 환경과 프로젝트 경계 고정",
+      "depends_on": [],
+      "dependency_level": 0,
+      "status": "planned",
+      "document": "track-f.md#f-01"
+    },
+    {
+      "id": "F-02",
+      "track": "F",
+      "title": "Envelope v1과 전송 경계 정의",
+      "depends_on": [
+        "F-01"
+      ],
+      "dependency_level": 1,
+      "status": "planned",
+      "document": "track-f.md#f-02"
+    },
+    {
+      "id": "F-03",
+      "track": "F",
+      "title": "Source 발행·탄창·attach 수명 계약",
+      "depends_on": [
+        "F-01"
+      ],
+      "dependency_level": 1,
+      "status": "planned",
+      "document": "track-f.md#f-03"
+    },
+    {
+      "id": "F-04",
+      "track": "F",
+      "title": "DSN 실행·메모리·플러그인 API 고정",
+      "depends_on": [
+        "F-01"
+      ],
+      "dependency_level": 1,
+      "status": "planned",
+      "document": "track-f.md#f-04"
+    },
+    {
+      "id": "F-05",
+      "track": "F",
+      "title": "Record·조회·export·View 경계 정의",
+      "depends_on": [
+        "F-01"
+      ],
+      "dependency_level": 1,
+      "status": "planned",
+      "document": "track-f.md#f-05"
+    },
+    {
+      "id": "F-06",
+      "track": "F",
+      "title": "성능·손실 계측 계획과 목표 정의",
+      "depends_on": [
+        "F-01"
+      ],
+      "dependency_level": 1,
+      "status": "planned",
+      "document": "track-f.md#f-06"
+    },
+    {
+      "id": "S-01",
+      "track": "S",
+      "title": "C++ Fire Gun과 Magazine 구현",
+      "depends_on": [
+        "F-03"
+      ],
+      "dependency_level": 2,
+      "status": "planned",
+      "document": "track-s.md#s-01"
+    },
+    {
+      "id": "S-02",
+      "track": "S",
+      "title": "C++ Encoder와 Sender 구현",
+      "depends_on": [
+        "S-01",
+        "F-02"
+      ],
+      "dependency_level": 3,
+      "status": "planned",
+      "document": "track-s.md#s-02"
+    },
+    {
+      "id": "S-03",
+      "track": "S",
+      "title": "C++ attach/detach와 재접속 구현",
+      "depends_on": [
+        "S-02"
+      ],
+      "dependency_level": 4,
+      "status": "planned",
+      "document": "track-s.md#s-03"
+    },
+    {
+      "id": "S-04",
+      "track": "S",
+      "title": "C++ SDK 패키지와 Mock 예제",
+      "depends_on": [
+        "S-03",
+        "I-04"
+      ],
+      "dependency_level": 5,
+      "status": "planned",
+      "document": "track-s.md#s-04"
+    },
+    {
+      "id": "K-01",
+      "track": "K",
+      "title": "Kernel·eBPF 발행 경로 구체화",
+      "depends_on": [
+        "F-01",
+        "F-03"
+      ],
+      "dependency_level": 2,
+      "status": "planned",
+      "document": "track-k.md#k-01"
+    },
+    {
+      "id": "K-02",
+      "track": "K",
+      "title": "Kernel Driver Source 구현",
+      "depends_on": [
+        "K-01",
+        "F-02"
+      ],
+      "dependency_level": 3,
+      "status": "planned",
+      "document": "track-k.md#k-02"
+    },
+    {
+      "id": "K-03",
+      "track": "K",
+      "title": "eBPF Source 및 중계 구현",
+      "depends_on": [
+        "K-01",
+        "F-02"
+      ],
+      "dependency_level": 3,
+      "status": "planned",
+      "document": "track-k.md#k-03"
+    },
+    {
+      "id": "K-04",
+      "track": "K",
+      "title": "Kernel·eBPF → Mock 통합",
+      "depends_on": [
+        "K-02",
+        "K-03",
+        "I-04"
+      ],
+      "dependency_level": 4,
+      "status": "planned",
+      "document": "track-k.md#k-04"
+    },
+    {
+      "id": "I-01",
+      "track": "I",
+      "title": "Transport Adapter 구현",
+      "depends_on": [
+        "F-02"
+      ],
+      "dependency_level": 2,
+      "status": "planned",
+      "document": "track-i.md#i-01"
+    },
+    {
+      "id": "I-02",
+      "track": "I",
+      "title": "Version Selector와 Decoder 구현",
+      "depends_on": [
+        "F-02"
+      ],
+      "dependency_level": 2,
+      "status": "planned",
+      "document": "track-i.md#i-02"
+    },
+    {
+      "id": "I-03",
+      "track": "I",
+      "title": "Ingress → Lifetime → Queue 인계",
+      "depends_on": [
+        "I-01",
+        "I-02",
+        "R-01",
+        "R-02",
+        "E-01"
+      ],
+      "dependency_level": 4,
+      "status": "planned",
+      "document": "track-i.md#i-03"
+    },
+    {
+      "id": "I-04",
+      "track": "I",
+      "title": "Console Echo DSN Mock 구현",
+      "depends_on": [
+        "I-01",
+        "I-02",
+        "R-01"
+      ],
+      "dependency_level": 3,
+      "status": "planned",
+      "document": "track-i.md#i-04"
+    },
+    {
+      "id": "R-01",
+      "track": "R",
+      "title": "Message Lifetime과 Checkout·Checkin 구현",
+      "depends_on": [
+        "F-04"
+      ],
+      "dependency_level": 2,
+      "status": "planned",
+      "document": "track-r.md#r-01"
+    },
+    {
+      "id": "R-02",
+      "track": "R",
+      "title": "Signal Buffer와 no_policy 구현",
+      "depends_on": [
+        "R-01"
+      ],
+      "dependency_level": 3,
+      "status": "planned",
+      "document": "track-r.md#r-02"
+    },
+    {
+      "id": "R-03",
+      "track": "R",
+      "title": "Registry와 Bulletin Board 구현",
+      "depends_on": [
+        "F-04"
+      ],
+      "dependency_level": 2,
+      "status": "planned",
+      "document": "track-r.md#r-03"
+    },
+    {
+      "id": "R-04",
+      "track": "R",
+      "title": "Workspace SDK와 예제 플러그인",
+      "depends_on": [
+        "F-04",
+        "P-01"
+      ],
+      "dependency_level": 3,
+      "status": "planned",
+      "document": "track-r.md#r-04"
+    },
+    {
+      "id": "R-05",
+      "track": "R",
+      "title": "단일 FIFO Executor 구현",
+      "depends_on": [
+        "R-01",
+        "R-02",
+        "R-03"
+      ],
+      "dependency_level": 4,
+      "status": "planned",
+      "document": "track-r.md#r-05"
+    },
+    {
+      "id": "R-06",
+      "track": "R",
+      "title": "다중 Workspace 수명 통합",
+      "depends_on": [
+        "R-04",
+        "R-05"
+      ],
+      "dependency_level": 5,
+      "status": "planned",
+      "document": "track-r.md#r-06"
+    },
+    {
+      "id": "E-01",
+      "track": "E",
+      "title": "Error Intake와 동일 오류 집계",
+      "depends_on": [
+        "F-04"
+      ],
+      "dependency_level": 2,
+      "status": "planned",
+      "document": "track-e.md#e-01"
+    },
+    {
+      "id": "E-02",
+      "track": "E",
+      "title": "Source 수신량과 폐기 계측",
+      "depends_on": [
+        "E-01",
+        "I-03",
+        "F-06"
+      ],
+      "dependency_level": 5,
+      "status": "planned",
+      "document": "track-e.md#e-02"
+    },
+    {
+      "id": "E-03",
+      "track": "E",
+      "title": "해당 Source 연결 종료 구현",
+      "depends_on": [
+        "E-01",
+        "I-01",
+        "F-02"
+      ],
+      "dependency_level": 3,
+      "status": "planned",
+      "document": "track-e.md#e-03"
+    },
+    {
+      "id": "A-01",
+      "track": "A",
+      "title": "Admin 전달·record 계약 정의",
+      "depends_on": [
+        "E-01",
+        "F-05"
+      ],
+      "dependency_level": 3,
+      "status": "planned",
+      "document": "track-a.md#a-01"
+    },
+    {
+      "id": "A-02",
+      "track": "A",
+      "title": "Admin Workspace 구현",
+      "depends_on": [
+        "A-01",
+        "R-04",
+        "P-01"
+      ],
+      "dependency_level": 4,
+      "status": "planned",
+      "document": "track-a.md#a-02"
+    },
+    {
+      "id": "P-01",
+      "track": "P",
+      "title": "Record 계약 및 저장·조회 대역",
+      "depends_on": [
+        "F-05"
+      ],
+      "dependency_level": 2,
+      "status": "planned",
+      "document": "track-p.md#p-01"
+    },
+    {
+      "id": "P-02",
+      "track": "P",
+      "title": "실제 Persistence Adapter",
+      "depends_on": [
+        "P-01"
+      ],
+      "dependency_level": 3,
+      "status": "planned",
+      "document": "track-p.md#p-02"
+    },
+    {
+      "id": "P-03",
+      "track": "P",
+      "title": "Export와 저장 배포 설정",
+      "depends_on": [
+        "P-02"
+      ],
+      "dependency_level": 4,
+      "status": "planned",
+      "document": "track-p.md#p-03"
+    },
+    {
+      "id": "V-01",
+      "track": "V",
+      "title": "사용자 View 정의와 원격 API",
+      "depends_on": [
+        "F-05"
+      ],
+      "dependency_level": 2,
+      "status": "planned",
+      "document": "track-v.md#v-01"
+    },
+    {
+      "id": "V-02",
+      "track": "V",
+      "title": "View 조회와 데이터 조합 구현",
+      "depends_on": [
+        "V-01",
+        "P-01"
+      ],
+      "dependency_level": 3,
+      "status": "planned",
+      "document": "track-v.md#v-02"
+    },
+    {
+      "id": "V-03",
+      "track": "V",
+      "title": "실제 저장소와 원격 View 연결",
+      "depends_on": [
+        "V-02",
+        "P-02"
+      ],
+      "dependency_level": 4,
+      "status": "planned",
+      "document": "track-v.md#v-03"
+    },
+    {
+      "id": "H-01",
+      "track": "H",
+      "title": "Host lifecycle·plugin 로딩 규약",
+      "depends_on": [
+        "F-01",
+        "F-04"
+      ],
+      "dependency_level": 2,
+      "status": "planned",
+      "document": "track-h.md#h-01"
+    },
+    {
+      "id": "H-02",
+      "track": "H",
+      "title": "Host와 Plugin Loader 구현",
+      "depends_on": [
+        "H-01",
+        "R-05",
+        "E-01",
+        "P-02"
+      ],
+      "dependency_level": 5,
+      "status": "planned",
+      "document": "track-h.md#h-02"
+    },
+    {
+      "id": "H-03",
+      "track": "H",
+      "title": "Docker 이미지와 실행 구성",
+      "depends_on": [
+        "H-02",
+        "I-03",
+        "P-03",
+        "V-03",
+        "R-06"
+      ],
+      "dependency_level": 6,
+      "status": "planned",
+      "document": "track-h.md#h-03"
+    },
+    {
+      "id": "X-01",
+      "track": "X",
+      "title": "C++ → Mock 인수 검증",
+      "depends_on": [
+        "S-04",
+        "I-04"
+      ],
+      "dependency_level": 6,
+      "status": "planned",
+      "document": "track-x.md#x-01"
+    },
+    {
+      "id": "X-02",
+      "track": "X",
+      "title": "C++ → DSN → Record 통합",
+      "depends_on": [
+        "X-01",
+        "I-03",
+        "R-06",
+        "P-02",
+        "H-02"
+      ],
+      "dependency_level": 7,
+      "status": "planned",
+      "document": "track-x.md#x-02"
+    },
+    {
+      "id": "X-03",
+      "track": "X",
+      "title": "전체 배포와 lifecycle 장애 통합",
+      "depends_on": [
+        "H-03",
+        "K-04",
+        "X-02",
+        "E-03",
+        "A-02"
+      ],
+      "dependency_level": 8,
+      "status": "planned",
+      "document": "track-x.md#x-03"
+    },
+    {
+      "id": "X-04",
+      "track": "X",
+      "title": "부하·메모리·지연 계측 및 보정",
+      "depends_on": [
+        "X-03",
+        "F-06",
+        "E-02"
+      ],
+      "dependency_level": 9,
+      "status": "planned",
+      "document": "track-x.md#x-04"
+    },
+    {
+      "id": "X-05",
+      "track": "X",
+      "title": "Release 산출물과 문서 인수",
+      "depends_on": [
+        "X-04",
+        "P-03",
+        "S-04",
+        "K-04",
+        "H-03"
+      ],
+      "dependency_level": 10,
+      "status": "planned",
+      "document": "track-x.md#x-05"
+    }
+  ]
+}

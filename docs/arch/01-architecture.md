@@ -23,21 +23,30 @@ flowchart LR
             Driver --> Transport
         end
         subgraph Container[Docker 안 / C# DSN]
-            Ingress[Ingress]
+            Ingress[Transport Adapter]
+            Decoder[버전 선택 / Envelope Decoder]
             Buffer[Signal Buffer]
             Board[Bulletin Board]
+            Execution[Workspace 실행 구성 요소]
             Workspaces[Workspace 플러그인]
+            Lifetime[Message Lifetime]
             Admin[Admin Space]
-            Errors[IErrorSink / 오류 집계]
+            Errors[오류 접수·집계 / IErrorSink]
             Persistence[Persistence 인터페이스]
-            View[View 조회 인터페이스]
-            Ingress --> Buffer --> Board --> Workspaces
+            Query[Record 조회 인터페이스]
+            View[View / 사용자별 데이터 구성]
+            Ingress --> Decoder --> Buffer --> Board --> Execution --> Workspaces
+            Decoder --> Errors
+            Execution --> Errors
+            Buffer -. 참조 보유 .-> Lifetime
+            Execution -. Checkout / Checkin .-> Lifetime
+            Workspaces -. Checkout / Checkin .-> Lifetime
             Ingress --> Errors
             Board --> Errors
-            Errors --> Admin
+            Errors -. 전달 규약 미정 .-> Admin
             Workspaces --> Persistence
             Admin --> Persistence
-            Persistence --> View
+            View --> Query --> Persistence
         end
         Transport --> Ingress
     end
@@ -52,13 +61,17 @@ flowchart LR
 | --- | --- |
 | Source / Message Builder | 환경에 맞는 API로 envelope과 payload를 구성 |
 | Source / Fire Gun | 메시지를 탄창에 적재하고 호출자에게 즉시 반환; 실제 전송 실행 흐름과 분리 |
-| Ingress / Sink | 전송 입력 수신, 버전별 decoder 선택, envelope의 구조 검증 |
+| Transport Adapter | 연결·수신·연결 종료 등 환경별 전송 처리 |
+| Envelope Decoder | 최소 공통 헤더에서 버전 선택, 버전별 구조 검증 및 공통 메시지 표현 제공 |
 | Signal Buffer | 수신한 메시지를 보유하고 기본 FIFO 순서로 제공 |
-| Bulletin Board | 등록된 Workspace 이름으로 분배하는 Facade, registry와 dispatcher 제공 |
+| Bulletin Board | Workspace registry와 전달 대상 결정; 수신 큐·dispatcher는 내부 계약 |
+| Workspace 실행 구성 요소 | Workspace 호출, 실행 흐름, 실패 처리 및 참조 반납 보장; 교체 가능한 실행 계약 |
+| Message Lifetime | 원본 버퍼, Checkout·Checkin, ref count와 회수 관리 |
+| 오류 접수·집계 | IErrorSink 구현, 동일 오류 집계 및 최초·최근 시각과 count 관리 |
 | Workspace | 읽기 전용 공유 메시지를 참조하고 payload를 record로 변환 |
-| Admin Space | IErrorSink로 전달된 오류와 관리 정보를 다루는 특별한 Workspace |
+| Admin Space | 오류·운영 정보를 관리용 record로 변환하는 특별한 Workspace |
 | Persistence | record 저장, 조회 및 export 인터페이스 제공 |
-| View | 여러 Workspace의 record field를 조합하여 원격 사용자에게 제공 |
+| View | 조회 인터페이스로 record에 접근하고 사용자별 field 선택·조합을 제공; Workspace 직접 조회 없음 |
 | DSN Mock | 실제 Source의 메시지를 수신하여 console에 echo하는 개발용 대체 수신기 |
 
 ## 실행과 분배 — 확정
@@ -67,7 +80,11 @@ DSN 시작 시 Workspace 플러그인을 동적으로 로딩한다. 각 Workspac
 
 메시지의 `workspace[]`가 전달 대상이다. 별도 topic은 두지 않는다. Workspace 자체가 topic과 유사한 분배 단위이며, `test.started` 같은 이벤트의 의미는 payload 안에서 처리한다.
 
-Workspace 간 처리 의존성은 없다. Workspace별 스레드나 병렬 실행은 필수 조건이 아니다. DSN의 CPU 부하를 줄이면서 동작하는 실행 방식을 선택한다. 느린 Workspace의 격리, 스케줄러, 실행 동시성은 추후 결정한다.
+Workspace 간 처리 의존성은 없다. Bulletin Board는 전달 대상을 결정하며, 별도 실행 구성 요소가 Workspace를 호출한다. 초기 구현은 단일 실행 루프에서 FIFO로 메시지를 꺼내 대상 Workspace를 순차 호출한다. Workspace별 큐나 전용 스레드는 기본 구성에 두지 않는다. 느린 Workspace는 후속 처리를 지연시킬 수 있으며, 격리나 병렬 실행은 실행 인터페이스를 통해 추후 변경한다. 실행 방식과 queue policy는 별개다.
+
+Message Lifetime은 Bulletin Board와 분리한다. Workspace는 Checkout한 참조를 파싱·복사 직후 Checkin하고, 원본과 독립적인 record를 저장한다. 실행 구성 요소는 실패 경로에서도 미반납 참조가 회수되도록 관리한다.
+
+오류 접수·집계는 Admin Space의 로딩·처리 완료에 의존하지 않는다. Admin Space는 record 변환을 담당하며 저장소·조회 cache·사용자 View 역할을 겸하지 않는다. Persistence는 저장·조회·export, View는 사용자별 데이터 선택·조합을 담당한다. Admin 전달 형식과 원본 첨부 규약은 미정이다.
 
 ## 수용과 손실 — 확정 및 구현 제약
 
