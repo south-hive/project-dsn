@@ -28,6 +28,8 @@ TCP byte stream에 UTF-8 JSON 한 개와 LF(`0x0a`)를 보낸다. JSON 문자열
 
 추가 필드는 무시한다. Core는 payload 업무 스키마를 검사하지 않는다. 중복 목적지는 첫 등장 한 번만 처리하고 없는 목적지는 오류를 남기며 유효한 목적지는 계속 호출한다. 여러 Source 사이에서는 서버 큐 적재 순서를 사용한다. Source time으로 정렬하지 않는다.
 
+`maxPayloadBytes` 설정은 0 이상의 안전한 정수만 허용한다. 0은 빈 payload만 허용한다. NaN·Infinity·음수·소수는 decoder 생성 시 거부하며 수신 경로에 진입하지 않는다.
+
 ## Session과 오류
 
 TCP 연결이 attach이며 첫 정상 envelope가 source_id를 연결에 묶는다. 연결당 하나의 source_id, source_id당 하나의 활성 연결을 허용하는 practice 선택이다. 별도 attach RPC는 없다. FIN/reset/서버 종료가 detach다. 기존 연결이 끊어지면 같은 source_id의 새 연결을 허용한다.

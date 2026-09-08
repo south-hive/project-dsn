@@ -8,8 +8,8 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "verify": "node --test --test-reporter=tap dist/test/verification.test.js",
-    "validate": "node --test --test-reporter=tap dist/test/validation.test.js",
+    "verify": "node --test --test-reporter=tap dist/test/verification.test.js dist/test/boundaries.test.js",
+    "validate": "node --test --test-reporter=tap dist/test/validation.test.js dist/test/recovery.test.js",
     "check": "npm run build && npm run verify && npm run validate",
     "start": "node dist/src/cli.js",
     "mock": "node dist/src/cli.js --mock",

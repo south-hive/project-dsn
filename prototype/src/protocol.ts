@@ -17,7 +17,11 @@ function text(value: unknown, name: string, max = 128): string {
 
 export class EnvelopeV1 implements IMessageDecoder {
   readonly version = 1;
-  constructor(readonly maxPayloadBytes = 16 * 1024) {}
+  constructor(readonly maxPayloadBytes = 16 * 1024) {
+    if (!Number.isSafeInteger(maxPayloadBytes) || maxPayloadBytes < 0) {
+      throw new Error('invalid payload limit');
+    }
+  }
   Decode(value: unknown): DecodedMessage {
     if (!object(value)) throw new DecodeError('INVALID_ENVELOPE', 'envelope must be an object');
     if (value.version !== 1) throw new DecodeError('UNSUPPORTED_VERSION', 'expected envelope v1');

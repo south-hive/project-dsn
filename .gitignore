@@ -3,3 +3,4 @@
 **/dist/
 /prototype/reports/*.tap
 /prototype/reports/*.json
+/tests/results/
