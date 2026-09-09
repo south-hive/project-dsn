@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Dsn.Contracts/Dsn.Contracts.csproj" />
+    <ProjectReference Include="../../src/Dsn.Runtime/Dsn.Runtime.csproj" />
+    <ProjectReference Include="../../src/Dsn.Ingress/Dsn.Ingress.csproj" />
+    <ProjectReference Include="../../src/Dsn.Persistence/Dsn.Persistence.csproj" />
+    <ProjectReference Include="../../src/Dsn.Diagnostics/Dsn.Diagnostics.csproj" />
+    <ProjectReference Include="../../src/Dsn.View/Dsn.View.csproj" />
+    <ProjectReference Include="../../src/Dsn.Host/Dsn.Host.csproj" />
+    <ProjectReference Include="../../samples/Dsn.Workspaces.Examples/Dsn.Workspaces.Examples.csproj" />
+    <Compile Include="../TestSupport/*.cs" Link="TestSupport/%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

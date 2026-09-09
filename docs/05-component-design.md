@@ -1,6 +1,6 @@
 # 5. Component Level Design Description
 
-컴포넌트는 코드의 책임 경계로 묶었다. 모든 static structure diagram에서 실선은 의존/호출, 점선은 인터페이스 구현이다. 공통 모델과 인터페이스의 정확한 시그니처는 [Contracts.cs](../src/Dsn.Contracts/Contracts.cs)가 기준이다.
+컴포넌트는 코드의 책임 경계로 묶었다. 모든 static structure diagram에서 실선은 의존/호출, 점선은 인터페이스 구현이다. 내부 요소는 기본 internal이고 외부 조립에 필요한 서비스와 계약만 공개한다. 공통 모델과 인터페이스의 정확한 시그니처는 [메시지](../src/Dsn.Contracts/Messages.cs)·[Workspace](../src/Dsn.Contracts/Workspaces.cs)·[record](../src/Dsn.Contracts/Records.cs)·[진단](../src/Dsn.Contracts/Diagnostics.cs) 계약가 기준이다.
 
 ## 5.1 Ingress / Mock
 
@@ -12,11 +12,11 @@ TCP 프레임과 session을 관리하고 버전에 맞게 Envelope를 검사한�
 
 ```mermaid
 flowchart LR
-    R["RpcServer"] --> P["Protocol"]
+    R["TcpNotificationReceiver"] --> P["NotificationProtocol"]
     P --> I["IMessageDecoder"]
     D["Version1Decoder"] -. "implements" .-> I
-    D --> M["DecodedMessage"]
-    R --> C["receive callback<br/>Runtime 또는 Mock"]
+    D --> M["InboundMessage"]
+    R --> C["IMessageSink<br/>Runtime 또는 Mock"]
     R --> E["IErrorSink"]
 ```
 
@@ -24,9 +24,9 @@ flowchart LR
 
 | 요소 | 책임·주요 규칙 |
 | --- | --- |
-| [RpcServer](../src/Dsn.Core/RpcServer.cs) | LF framing, 연결당 source_id 하나, Source당 활성 연결 하나. Source 변경/중복 접속 시 해당 session 종료 |
-| [Protocol / IMessageDecoder](../src/Dsn.Core/Protocol.cs) | notification 검사, 정수 version으로 decoder 선택 |
-| Version1Decoder / DecodedMessage | 공통 Envelope와 decoded bytes. canonical base64, 빈 payload 허용, timezone 있는 ISO 시각 |
+| [TcpNotificationReceiver](../src/Dsn.Ingress/TcpNotificationReceiver.cs) | LF framing, 연결당 source_id 하나, Source당 활성 연결 하나. Source 변경/중복 접속 시 해당 session 종료 |
+| [NotificationProtocol / IMessageDecoder](../src/Dsn.Ingress/NotificationProtocol.cs) | notification 검사, 정수 version으로 decoder 선택 |
+| Version1Decoder / InboundMessage | 공통 Envelope와 decoded bytes. canonical base64, 빈 payload 허용, timezone 있는 ISO 시각 |
 | [Mock](../src/Dsn.Mock/Program.cs) | 유한 출력 queue, 초과 출력 폐기 및 진단 |
 
 기본 frame 65,536 bytes, payload 16,384 bytes, JSON depth 32다. source_id는 공백만 아닌 최대 128 UTF-16 units, event_type은 최대 64, time은 최대 40이다. Workspace는 1–32개이며 이름은 `[a-z][a-z0-9-]{0,63}`이다. description은 임의 JSON이며 추가 필드는 무시한다. version/envelope 오류는 폐기·집계 후 연결 유지, RPC/framing 오류는 해당 연결 종료다.
@@ -45,29 +45,33 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    R["DsnRuntime<br/>queue·registry"] --> Q["IQueuePolicy / NoPolicy"]
-    R --> X["IWorkspaceExecutor<br/>SequentialExecutor"]
-    R --> L["Lifetime / OwnedMessage"]
+    R["DsnRuntime"] --> Q["FifoMessageQueue"]
+    R --> B["WorkspaceRegistry"]
+    R --> S["SequentialScheduler"]
+    S --> X["WorkspaceInvocation"]
     X --> C["MessageContext"]
-    C --> P["Lease / IReadOnlyPayload"]
-    P --> L
     X --> W["IWorkspace"]
+    C --> P["Lease"]
+    P --> L["OwnedMessage / Lifetime"]
+    R -->|"root 소유·반환"| L
 ```
 
 ### Element List
 
 | 요소 | 책임·주요 규칙 |
 | --- | --- |
-| [DsnRuntime](../src/Dsn.Core/Runtime.cs) | Register/Start/Submit/Drain/Stop, 한도 검사, 시작 이후 registry 변경 금지 |
-| NoPolicy / SequentialExecutor | FIFO 소비, 대상 중복 제거, 예외/미등록 대상 진단 후 다음 대상 호출 |
-| [Lifetime / OwnedMessage](../src/Dsn.Core/Lifetime.cs) | 원본 소유·ref count·한도·회수. Submit 이후 호출자는 인계한 bytes를 수정하지 않음 |
+| [DsnRuntime](../src/Dsn.Runtime/DsnRuntime.cs) | IMessageSink/IWorkspaceRegistration, Start/Drain/Stop, dispatch root 소유, 읽기 전용 LifetimeStats |
+| [FifoMessageQueue](../src/Dsn.Runtime/Queue/FifoMessageQueue.cs) / [WorkspaceRegistry](../src/Dsn.Runtime/Registry/WorkspaceRegistry.cs) | 유한 FIFO, 시작 전 등록, 중복 대상 제거·대상 결정 |
+| [SequentialScheduler](../src/Dsn.Runtime/Execution/SequentialScheduler.cs) | 순차 호출과 시작 전 취소 확인. 원본·context 해제 권한 없음 |
+| [WorkspaceInvocation](../src/Dsn.Runtime/Invocation/WorkspaceInvocation.cs) | 한 호출의 ProcessAsync 완료·실패 후 context 정리, 중복 실행 거부 |
+| [Lifetime / OwnedMessage](../src/Dsn.Runtime/Lifetime/Lifetime.cs) | 원본 소유·ref count·한도·회수. TrySubmit 이후 호출자는 인계한 bytes를 수정하지 않음 |
 | MessageContext / Lease | Checkout/Checkin과 호출 종료 정리, 동시 읽기/반납 동기화, 반납 후 접근 거부 |
 
 중복 Checkin은 false이고 다른 context의 lease는 거부한다. 원본 Span/Memory를 공개하지 않으며 Copy/문자열 변환은 명시적 복사다. `references = created + checkouts - checkins`이고 0에서 bytes 참조를 해제한다. 실제 GC 시점은 보장하지 않는다. 종료 timeout은 대기 원본을 반환하고 active 호출에는 취소를 요청한다.
 
 ### Design Rationale
 
-순서 정책과 호출 방법을 분리해 향후 실행 방식 변경 지점을 확보했다(D3). root는 후속 대상의 읽기를 보장하고 context는 실패 시 누락된 반납을 처리한다(D4/D8). 느린 저장 동안 root가 남고 뒤 메시지가 지연되는 비용을 수용한다.
+호출 완료는 ProcessAsync에서 시작한 모든 원본 접근의 종료를 뜻한다. 호출 객체가 이 완료 뒤 context를 정리하고, Runtime이 dispatch 완료 뒤 root를 반환한다(D3/D4/D8). 단순 interface 교체로 병렬화를 지원한다고 가정하지 않으며 detached 원본 접근은 금지한다. 느린 저장 동안 root가 남고 뒤 메시지가 지연되는 비용을 수용한다.
 
 ## 5.3 Workspace
 
@@ -90,8 +94,8 @@ flowchart LR
 
 | 요소 | 책임·주요 규칙 |
 | --- | --- |
-| [IWorkspacePlugin / WorkspaceServices](../src/Dsn.Contracts/Contracts.cs) | API version 1 factory, record 저장·진단 의존성 제공 |
-| [PayloadWorkspace](../src/Dsn.Workspaces/Workspaces.cs) | Checkout → 해석/값 복사 → finally Checkin → AppendAsync |
+| [IWorkspacePlugin / WorkspaceServices](../src/Dsn.Contracts/Workspaces.cs) | API version 1 factory, record 저장·진단 의존성 제공 |
+| [PayloadWorkspace](../samples/Dsn.Workspaces.Examples/Workspaces.cs) | Checkout → 해석/값 복사 → finally Checkin → AppendAsync |
 | EchoPlugin / HexPlugin | 각각 UTF-8/hex record 생성. source/time/event_type/payload_bytes/message_id 포함 |
 
 ### Design Rationale
@@ -118,7 +122,7 @@ flowchart LR
 
 | 요소 | 책임·주요 규칙 |
 | --- | --- |
-| [ErrorSink](../src/Dsn.Core/Diagnostics.cs) | ErrorBody 전체 값으로 동일성 비교, first/last/count, 유한 종류 수와 dropped |
+| [ErrorSink](../src/Dsn.Diagnostics/Diagnostics.cs) | ErrorBody 전체 값으로 동일성 비교, first/last/count, 유한 종류 수와 dropped |
 | ErrorBody / ErrorAggregate | Code/Component/SourceId/Workspace/Detail과 별도 집계 시각·count |
 | AdminWorkspace | 변경 revision의 snapshot을 `admin` record로 변환. 원본 payload 첨부 없음 |
 
@@ -152,8 +156,8 @@ flowchart LR
 
 | 요소 | 책임·주요 규칙 |
 | --- | --- |
-| [JournalStore](../src/Dsn.Core/Persistence.cs) | 값 복사·id 부여·append·Flush(true)·재시작 복구, 성공 후 조회 가시성 |
-| [MemoryRecordStore](../src/Dsn.Core/MemoryRecordStore.cs) | 같은 record/query 규칙의 비영속 대역 |
+| [JournalStore](../src/Dsn.Persistence/JournalStore.cs) | 값 복사·id 부여·append·Flush(true)·재시작 복구, 성공 후 조회 가시성 |
+| [MemoryRecordStore](../src/Dsn.Persistence/MemoryRecordStore.cs) | 같은 record/query 규칙의 비영속 대역. Journal 클래스 대신 내부 RecordValidation을 공유 |
 | RecordInput / StoredRecord | Workspace 이름과 1–128개 scalar field, 저장 id. 중복 Append는 별도 record |
 | RecordQuery / Export | Workspace 필터, id 오름차순, `afterId` exclusive, limit 1–1000, NDJSON |
 
@@ -175,7 +179,7 @@ BCL만으로 저장 성공과 재시작 의미를 명확히 했다(D5). 대신 �
 
 ```mermaid
 flowchart LR
-    H["HTTP endpoints<br/>DsnApplication"] --> V["ViewService"]
+    H["HTTP endpoints<br/>ViewEndpoints"] --> V["ViewService"]
     H --> D["ViewDefinitions"]
     V --> Q["IRecordQuery"]
     D --> F["views.json"]
@@ -185,15 +189,15 @@ flowchart LR
 
 | 요소 | 책임·주요 규칙 |
 | --- | --- |
-| [ViewService](../src/Dsn.Core/Views.cs) | field 존재 검사·record 투영. 해당 row에 없는 값은 null |
+| [ViewService](../src/Dsn.View/Views.cs) | field 존재 검사·record 투영. 해당 row에 없는 값은 null |
 | ViewDefinition / ViewDefinitions | Workspace/field 목록, 사용자별 이름 공간, temp flush 후 rename 저장 |
-| [HTTP endpoints](../src/Dsn.Host/DsnApplication.cs) | bearer token, Workspace scope, View/목록/export/오류 응답 |
+| [HTTP adapter](../src/Dsn.Host/Http/ViewEndpoints.cs) | bearer token, Workspace scope, View/목록/export/오류 응답 |
 
 정의당 Workspace/field 각 최대 32, 사용자당 정의 128개, 정의 파일 4 MiB 한도다. field 목록은 저장된 record에서 얻으므로 첫 데이터 전에는 payload field를 검증할 수 없다. HTTP body 기본 한도는 16 KiB, 저장/조회 I/O 실패는 503이다.
 
 ### Design Rationale
 
-record 생성과 조회를 분리하고 같은 데이터에 여러 사용자 정의를 적용한다(D7). 행 결합 의미를 임의로 만들지 않도록 column 투영으로 한정했다. 인증과 HTTP wiring은 아직 Host 파일에 함께 있어 변경 범위가 집중된다.
+record 생성과 조회를 분리하고 같은 데이터에 여러 사용자 정의를 적용한다(D7). 행 결합 의미를 임의로 만들지 않도록 column 투영으로 한정했다. 인증과 HTTP wiring은 Host의 별도 ViewEndpoints adapter에 두고, View assembly에는 ASP.NET 의존성을 넣지 않는다.
 
 ## 5.7 Host / Plugin Loading
 
@@ -218,7 +222,7 @@ flowchart LR
 | --- | --- |
 | [Settings](../src/Dsn.Host/Settings.cs) | 키·범위·token/scope·바인딩 검사 |
 | [DsnApplication](../src/Dsn.Host/DsnApplication.cs) | 초기화/rollback, endpoint, Admin timer, drain·최종 저장·종료 |
-| [PluginLoader](../src/Dsn.Core/Plugins.cs) | factory 검색, API version 검사, 의존 assembly 해석, Contracts assembly 공유 |
+| [PluginLoader](../src/Dsn.Host/Plugins/PluginLoader.cs) | factory 검색, API version 검사, 의존 assembly 해석, Contracts assembly 공유, IWorkspaceRegistration으로 등록 |
 | [Program](../src/Dsn.Host/Program.cs) | 설정 경로, ready 출력, Ctrl+C/SIGTERM 처리 |
 
 ### Design Rationale

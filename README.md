@@ -10,7 +10,7 @@
 # Termux
 pkg install dotnet-sdk-10.0
 bash scripts/check.sh
-# 터미널 1: RPC 7070 / HTTP 7071
+# 터미널 1: TCP 입력 7070 / HTTP 7071
 dotnet run --project src/Dsn.Host -c Release --no-build
 # 터미널 2
 dotnet run --project tests/Dsn.TestSource -c Release --no-build -- 7070 hello 3
@@ -40,3 +40,5 @@ docker compose down
 Compose는 호스트 loopback에 포트를 공개하고 `dsn-data` volume에 record와 View 정의를 유지한다. 외부 HTTP 노출에는 별도 TLS proxy를 구성한다. [배포 구조](docs/04-top-level-design.md#deployment-view)
 
 검증된 환경은 Termux SDK 10.0.111 / runtime 10.0.11이다. Docker 실행은 미검증이며, 구체적인 통과 범위와 한계는 [Architecture Evaluation](docs/06-architecture-evaluation.md)에 기록했다. 이전 TypeScript 실험은 `prototype/`에 보존한다.
+
+솔루션은 `DSN.sln`이다. 기능 프로젝트는 `Dsn.Contracts`만 참조하며 빌드에서 의존 경계를 검사한다. 예제 plugin은 `samples/Dsn.Workspaces.Examples`, 단위·통합 테스트는 각각 `tests/Dsn.UnitTests`, `tests/Dsn.IntegrationTests`에 있다.

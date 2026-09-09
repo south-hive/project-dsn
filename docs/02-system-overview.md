@@ -25,7 +25,7 @@ flowchart LR
 | Record | 저장소가 부여한 id, Workspace 이름, field 값. 원본과 독립 |
 | View | 허용된 Workspace의 record에서 선택할 field를 정의. 사용자별 보존 |
 
-RPC는 UTF-8 JSON 한 개와 LF를 보내는 `dsn.publish` notification이다. 완전한 JSON-RPC 서버가 아니며 request/id/batch를 지원하지 않는다. transport 상태는 관찰 가능하지만 메시지 처리·저장 응답은 없다.
+입력 전송은 UTF-8 JSON 한 개와 LF를 보내는 `dsn.publish` notification이다. 완전한 JSON-RPC 서버가 아니며 request/id/batch를 지원하지 않는다. transport 상태는 관찰 가능하지만 메시지 처리·저장 응답은 없다.
 
 ```json
 {"jsonrpc":"2.0","method":"dsn.publish","params":{"version":1,"source_id":"sample","time":"2026-09-08T00:00:00Z","event_type":"normal","workspace":["echo","hex"],"payload":"aGVsbG8="}}
@@ -43,6 +43,8 @@ RPC는 UTF-8 JSON 한 개와 LF를 보내는 `dsn.publish` notification이다. �
 
 ## 운영 환경
 
-기본 RPC/HTTP 포트는 7070/7071, Mock은 7072다. 기본 바인딩은 loopback이며 인증 없는 로컬 조회를 허용한다. 원격 바인딩은 사용자별 bearer token과 허용 Workspace 설정을 요구한다. HTTP를 외부에 노출하는 배치는 TLS reverse proxy를 전제로 한다. Source별 ACL과 RPC 인증은 구현하지 않았다.
+기본 TCP 입력/HTTP 포트는 7070/7071, Mock은 7072다. 기본 바인딩은 loopback이며 인증 없는 로컬 조회를 허용한다. 원격 바인딩은 사용자별 bearer token과 허용 Workspace 설정을 요구한다. HTTP를 외부에 노출하는 배치는 TLS reverse proxy를 전제로 한다. Source별 ACL과 TCP 입력 인증은 구현하지 않았다.
 
 설정은 JSON 파일 하나 또는 코드 기본값을 사용한다. 상대 경로는 실행 디렉터리 기준이고 알 수 없는 키·잘못된 범위는 시작 시 거부한다. 상세 기본값은 [settings.example.json](../settings.example.json), 검증 규칙은 [Settings.cs](../src/Dsn.Host/Settings.cs)가 기준이다.
+
+기존 설정 키 `rpcPort`, ready 출력의 `rpcPort`, wire의 `jsonrpc`/`dsn.publish`와 오류 코드는 호환성을 위해 유지한다. 구현 명칭은 `TcpNotificationReceiver`와 `NotificationProtocol`이며 범용 RPC 서비스를 의미하지 않는다.

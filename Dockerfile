@@ -1,7 +1,8 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /source
-COPY Directory.Build.props global.json ./
+COPY Directory.Build.props Directory.Build.targets global.json ./
 COPY src/ src/
+COPY samples/ samples/
 RUN dotnet publish src/Dsn.Host/Dsn.Host.csproj -c Release -o /out/host --nologo \
  && dotnet publish src/Dsn.Mock/Dsn.Mock.csproj -c Release -o /out/mock --nologo
 

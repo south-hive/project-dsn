@@ -1,1 +1,7 @@
-<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType></PropertyGroup><ItemGroup><ProjectReference Include="../Dsn.Core/Dsn.Core.csproj" /></ItemGroup></Project>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Dsn.Contracts/Dsn.Contracts.csproj" />
+    <ProjectReference Include="../Dsn.Ingress/Dsn.Ingress.csproj" />
+  </ItemGroup>
+</Project>

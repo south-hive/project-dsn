@@ -1,0 +1,14 @@
+<Project>
+  <PropertyGroup>
+    <DsnContractOnly Condition="'$(MSBuildProjectName)' == 'Dsn.Runtime' or '$(MSBuildProjectName)' == 'Dsn.Ingress' or '$(MSBuildProjectName)' == 'Dsn.Persistence' or '$(MSBuildProjectName)' == 'Dsn.Diagnostics' or '$(MSBuildProjectName)' == 'Dsn.View' or '$(MSBuildProjectName)' == 'Dsn.Workspaces.Examples'">true</DsnContractOnly>
+  </PropertyGroup>
+  <Target Name="ValidateArchitecture" BeforeTargets="ResolveProjectReferences">
+    <ItemGroup>
+      <_ForbiddenDependency Include="@(ProjectReference)" Condition="'$(DsnContractOnly)' == 'true' and '%(Filename)' != 'Dsn.Contracts'" />
+      <_ForbiddenDependency Include="@(ProjectReference)" Condition="'$(MSBuildProjectName)' == 'Dsn.Contracts'" />
+      <_ForbiddenDependency Include="@(ProjectReference)" Condition="'$(MSBuildProjectName)' == 'Dsn.Mock' and '%(Filename)' != 'Dsn.Contracts' and '%(Filename)' != 'Dsn.Ingress'" />
+      <_ForbiddenDependency Include="@(Reference)" Condition="'$(DsnContractOnly)' == 'true' and $([System.String]::Copy('%(Identity)').StartsWith('Dsn.'))" />
+    </ItemGroup>
+    <Error Condition="'@(_ForbiddenDependency)' != ''" Text="DSN architecture violation in $(MSBuildProjectName): @(_ForbiddenDependency). Feature libraries may depend only on Dsn.Contracts." />
+  </Target>
+</Project>

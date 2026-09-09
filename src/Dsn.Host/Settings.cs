@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Dsn.Core;
+using Dsn.Contracts;
 
 namespace Dsn.Host;
 
@@ -32,13 +32,13 @@ public sealed class Settings
             PayloadBytes < 0 || PayloadBytes > FrameBytes || ErrorCapacity < 1 || RecordCapacity < 1 || JournalBytes < 1 || ShutdownSeconds is < 1 or > 300 ||
             string.IsNullOrWhiteSpace(DataDirectory) || Plugins is null || Users is null) throw new ArgumentException("Invalid DSN settings");
         if (!IPAddress.IsLoopback(address) && Users.Count == 0) throw new ArgumentException("Remote View requires configured users/tokens");
-        if (Users.Count > 128 || Users.Any(p => !Names.Valid(p.Key) || p.Value is null || string.IsNullOrWhiteSpace(p.Value.Token) || p.Value.Token.Length < 16 ||
-            p.Value.Workspaces is null || p.Value.Workspaces.Length is < 1 or > 32 || p.Value.Workspaces.Any(w => !Names.Valid(w))) || Users.Values.Select(u => u.Token).Distinct().Count() != Users.Count)
+        if (Users.Count > 128 || Users.Any(p => !ContractNames.Workspace(p.Key) || p.Value is null || string.IsNullOrWhiteSpace(p.Value.Token) || p.Value.Token.Length < 16 ||
+            p.Value.Workspaces is null || p.Value.Workspaces.Length is < 1 or > 32 || p.Value.Workspaces.Any(w => !ContractNames.Workspace(w))) || Users.Values.Select(u => u.Token).Distinct().Count() != Users.Count)
             throw new ArgumentException("Invalid user configuration");
     }
     public static Settings Load(string? path)
     {
-        var options = new JsonSerializerOptions(Json.Options) { UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow };
+        var options = new JsonSerializerOptions(JsonFormat.Options) { UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow };
         var settings = path is null ? new Settings() : JsonSerializer.Deserialize<Settings>(File.ReadAllText(path), options) ?? throw new ArgumentException("Null settings");
         settings.Validate(); return settings;
     }

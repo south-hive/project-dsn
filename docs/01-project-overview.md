@@ -15,7 +15,7 @@ DSN은 시험 프로그램과 장치가 발생시키는 메시지를 수집하�
 | 동일 RPC 계약의 독립 console Mock, 테스트 Source | production Source SDK, 전달 보장, exactly-once |
 | build/test/publish 및 Docker 배포 구성 | GUI, 임의 record join, 상세 운영 monitoring |
 
-C# 본체는 `src/`, 테스트는 `tests/Dsn.Tests`와 `tests/Dsn.TestSource`에 있다. `prototype/`은 이전 TypeScript 실험 모델이며 현재 제품 구현과 별개다.
+C# 본체는 `src/`, 테스트는 `tests/Dsn.UnitTests`·`tests/Dsn.IntegrationTests`와 `tests/Dsn.TestSource`에 있다. `prototype/`은 이전 TypeScript 실험 모델이며 현재 제품 구현과 별개다.
 
 ## 완료 판단
 

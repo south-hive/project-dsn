@@ -33,7 +33,7 @@
 | C2 | Source 부담 최소화, 손실 허용, 업무 ACK/NACK 없음 | notification 입력과 유한 수용량, 전송 성공을 저장 성공으로 취급하지 않음 |
 | C3 | 공통 계층은 payload 의미를 모름 | 버전별 봉투 검사와 Workspace 해석 분리 |
 | C4 | DSN 내부 공유 원본 하나, 명시적 Checkout/Checkin | root·lease 수명 관리, 저장 전 필요한 값 복사 |
-| C5 | 초기 FIFO·순차 실행, Workspace 간 처리 의존성 없음 | queue policy와 executor 분리, 기본 재정렬/병렬화 없음 |
+| C5 | 초기 FIFO·순차 실행, Workspace 간 처리 의존성 없음 | 호출 순서와 수명 정리 분리, 지원 실행 방식은 순차로 한정 |
 | C6 | 시작 시 신뢰하는 로컬 plugin 로딩 | 동적 DLL 계약, 중복 이름 거부, hot reload/sandbox 없음 |
 | C7 | View는 저장된 record만 조회 | Workspace 직접 조회 금지, 기록·조회 계약 분리 |
 
