@@ -1,5 +1,6 @@
 services:
   dsn:
+    image: ${DSN_IMAGE:-dsn:local}
     build: .
     command: ["/config/settings.json"]
     ports:
@@ -7,7 +8,12 @@ services:
       - "127.0.0.1:7071:7071"
     volumes:
       - dsn-data:/data
-      - ./settings.docker.json:/config/settings.json:ro
+      - type: bind
+        source: ./settings.docker.json
+        target: /config/settings.json
+        read_only: true
+        bind:
+          create_host_path: false
     stop_grace_period: 30s
 volumes:
   dsn-data:

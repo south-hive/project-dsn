@@ -65,7 +65,8 @@ await suite.Test("HTTP View authorization, per-user saved definitions, field com
         using var source = new TcpClient(); await source.ConnectAsync(IPAddress.Loopback, host.Ingress.Port);
         await source.GetStream().WriteAsync(Suite.Frame("test", ["echo", "hex"], "hello"u8.ToArray()));
         await Suite.Eventually(() => host.Runtime.LifetimeStats.Reclaimed == 1);
-        using var client = new HttpClient { BaseAddress = new(host.ViewAddress) };
+        // Connect directly to the local test host regardless of proxy environment variables.
+        using var client = new HttpClient(new HttpClientHandler { UseProxy = false }) { BaseAddress = new(host.ViewAddress) };
         Suite.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/view")).StatusCode);
         client.DefaultRequestHeaders.Authorization = new("Bearer", "alice-test-token-1234");
         Suite.Check((await client.GetStringAsync("/fields")).Contains("payload_hex"));
@@ -84,7 +85,8 @@ await suite.Test("HTTP View authorization, per-user saved definitions, field com
     }
     await using (var host = new DsnApplication(settings))
     {
-        await host.StartAsync(); using var client = new HttpClient { BaseAddress = new(host.ViewAddress) };
+        await host.StartAsync();
+        using var client = new HttpClient(new HttpClientHandler { UseProxy = false }) { BaseAddress = new(host.ViewAddress) };
         client.DefaultRequestHeaders.Authorization = new("Bearer", "alice-test-token-1234");
         Suite.Equal(2, (await client.GetFromJsonAsync<JsonElement>("/views/mine")).GetArrayLength());
     }

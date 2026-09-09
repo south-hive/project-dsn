@@ -107,7 +107,7 @@ flowchart LR
     end
 ```
 
-[Dockerfile](../Dockerfile)은 .NET SDK로 Host/Mock을 publish하고 ASP.NET runtime 이미지에 배치한다. [Compose](../compose.yaml)는 호스트 loopback에만 포트를 공개한다. 컨테이너 설정은 `bind=0.0.0.0`, `dataDirectory=/data`, 사용자 토큰을 지정한다. 추가 plugin은 경로 설정과 파일 배치가 필요하다. reverse proxy는 Compose에 포함돼 있지 않다.
+[Dockerfile](../Dockerfile)은 .NET SDK로 Host와 예제 plugin을 publish하고 ASP.NET Chiseled Extra runtime에 배치한다. Mock·SDK·소스·디버그 심볼은 이미지에서 제외하며 ICU·시간대 지원과 동적 plugin 로딩은 유지한다. [Compose](../compose.yaml)는 호스트 loopback에만 포트를 공개한다. [Makefile](../Makefile)의 `deploy`는 설정 생성·이미지 빌드·실행, `deploy-image`는 게시된 이미지 실행을 수행한다. 컨테이너 설정은 `bind=0.0.0.0`, `dataDirectory=/data`, 사용자 토큰을 지정한다. 추가 plugin은 경로 설정과 파일 배치가 필요하다. reverse proxy는 Compose에 포함돼 있지 않다.
 
 ## Design Decision
 

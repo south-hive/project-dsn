@@ -1,8 +1,12 @@
-.git
-requirement
-prototype
+# Only build inputs enter the context; settings, tokens and artifacts stay out.
+**
+!Directory.Build.props
+!Directory.Build.targets
+!global.json
+!src/
+!src/**
+!samples/
+!samples/**
 **/bin
 **/obj
-**/node_modules
-data
-tests/results
+src/Dsn.Mock

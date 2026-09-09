@@ -10,9 +10,10 @@
 - publish 산출물 검사: 제거된 Core assembly 없음, 예제는 plugins 디렉터리로 배치, Mock은 Ingress/Contracts만 포함.
 - publish된 Host + 테스트 Source: notification 5개 → echo/hex record 10개, 실제 HTTP 값·journal 확인, SIGTERM exit 0.
 - publish된 독립 Mock + 테스트 Source: 정확한 payload hex, SIGTERM exit 0.
+- 배포 설정: Compose 공식 schema 검증, 임의 토큰 생성·기존 설정 보존, Make 명령 연결·CI 실패 시 빌드 중단 확인. Docker 입력 파일만 복사한 별도 경로에서 publish하여 Host/plugin 포함과 Mock·소스·PDB 제외 확인.
 - Docker 이미지 build/run과 Linux CoreCLR 실행은 미검증.
 
-재현 명령은 저장소 루트에서 `bash scripts/check.sh`, `bash scripts/publish.sh`다. 후자는 산출물 생성이며 프로세스 smoke test나 Docker 인수를 자동 수행하지 않는다.
+재현 명령은 저장소 루트에서 `make check`, `make publish`다(기존 shell script도 사용 가능). `make ci`는 검증 후 Docker 이미지를 빌드한다. publish와 이미지 빌드는 프로세스 smoke test나 컨테이너 실행 인수를 자동 수행하지 않는다.
 
 ## Driver별 평가
 

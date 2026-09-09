@@ -4,14 +4,15 @@ COPY Directory.Build.props Directory.Build.targets global.json ./
 COPY src/ src/
 COPY samples/ samples/
 RUN dotnet publish src/Dsn.Host/Dsn.Host.csproj -c Release -o /out/host --nologo \
- && dotnet publish src/Dsn.Mock/Dsn.Mock.csproj -c Release -o /out/mock --nologo
+    -p:DebugType=None -p:DebugSymbols=false \
+ && mkdir /out/data
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+# Keep ICU/time-zone support for plugins, without a shell or package manager.
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled-extra AS runtime
 WORKDIR /app
 COPY --from=build /out/host/ ./
-COPY --from=build /out/mock/ ./mock/
-RUN mkdir /data && chown $APP_UID /data
+COPY --from=build --chown=$APP_UID:$APP_UID /out/data/ /data/
 USER $APP_UID
-EXPOSE 7070 7071 7072
+EXPOSE 7070 7071
 VOLUME ["/data"]
 ENTRYPOINT ["dotnet", "Dsn.Host.dll"]
