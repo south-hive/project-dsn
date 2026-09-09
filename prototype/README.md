@@ -1,6 +1,6 @@
 # DSN practice prototype
 
-TypeScript 인터페이스와 echo stub을 실제 TCP/HTTP로 연결한 실행 모델이다. [아키텍처](../docs/arch/README.md)의 메시지 소유권, FIFO 실행, Workspace·Persistence·View 경계를 검증한다. Production의 C#·Docker 선택은 유지하며, 여기의 RPC 표현과 저장 방식은 practice 전용이다.
+TypeScript 인터페이스와 echo stub을 실제 TCP/HTTP로 연결한 실행 모델이다. [아키텍처](../docs/README.md)의 메시지 소유권, FIFO 실행, Workspace·Persistence·View 경계를 검증한다. Production의 C#·Docker 선택은 유지하며, 여기의 RPC 표현과 저장 방식은 practice 전용이다.
 
 ## 실행
 

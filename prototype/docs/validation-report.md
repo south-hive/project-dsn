@@ -2,7 +2,7 @@
 
 이 문서는 최초 32건 검증의 과거 기록이다. 추가 경계·복구 시험 및 결함 수정 이후 결과는 [tests 최신 보고서](../../tests/report.md)를 기준으로 확인한다.
 
-실행일: 2026-09-08. 대상: `practice` 브랜치의 `prototype/`. 설계 기준: [계약](../../docs/arch/02-contracts.md), [Source 경계](../../docs/arch/03-source-and-mock.md), [검증 계획](../../docs/arch/11-verification.md). 이 문서의 상대 경로는 저장소 내 실제 파일을 가리킨다.
+실행일: 2026-09-08. 대상: `practice` 브랜치의 `prototype/`. 기능 경계 참조(현재 문서): [계약](../../docs/05-component-design.md), [Source 경계](../../docs/02-system-overview.md), [현재 평가](../../docs/06-architecture-evaluation.md). 이 문서의 상대 경로는 저장소 내 실제 파일을 가리킨다.
 
 ## 판정
 
@@ -74,7 +74,7 @@ T02의 Source 호출 경로, T16의 영속 저장·재시작 복구, T17의 실�
 | RISK-08 / QA-07 | decoder 교체 지점과 plugin 버전 검증 | practice wire와 production IDL/ABI는 별도; queue policy는 현재 index 선택 hook만 제공 |
 | RISK-01·09 / QA-01·04 | 이번 성능 평가 없음 | Source 호출 지연·CPU·계측 비용은 1차 이후 실제 환경에서 평가 |
 
-관측 항목은 아이디어이며 운영 수집기·대시보드·경고·자동 조치는 추가하지 않았다. 기존 [QA 위험 등록부](../../docs/arch/13-quality-attributes-and-risks.md)의 production 위험 상태는 변경하지 않는다.
+관측 항목은 아이디어이며 운영 수집기·대시보드·경고·자동 조치는 추가하지 않았다. 현재 C# 구현의 품질 판정은 [Architecture Evaluation](../../docs/06-architecture-evaluation.md)을 따른다. 이 프로토타입 결과만으로 production 품질을 판정하지 않는다.
 
 ## 재현
 
