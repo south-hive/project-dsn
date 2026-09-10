@@ -2,23 +2,21 @@
 
 ## 목적
 
-DSN은 시험 프로그램과 장치가 발생시키는 메시지를 수집하여, 필요한 데이터로 해석·저장하고 조회하는 플랫폼이다. 평가자는 시험 진행 상태와 이상 발생 이력을 확인하고, 관리자는 수신·처리 오류를 확인한다. 특정 시험 시나리오나 payload 형식에 종속되지 않는다.
+DSN은 다양한 앱 Source의 데이터를 로컬에서 수집·보존하고 Source → Filter → Sink로 처리하는 .NET 플랫폼이다. Workspace는 payload를 해석하는 첫 단계, 후속 Filter는 scalar 결과의 변환·선별, Sink는 저장/출력을 담당한다. 사무 PC 브라우저에서 시험 PC에 직접 접속할 수 있다.
 
-메시지 발행이 원래 시험 작업을 방해하지 않는 것을 우선한다. 전달 손실을 허용하며 메시지별 ACK/NACK이나 자동 재전송을 요구하지 않는다. Source 내부의 비대기 발행 구현과 그 성능 검증은 실제 Source의 책임이다.
+분석 의미는 Source와 Workspace가 합의한다. 목적형 payload와 사후 원본 재처리를 모두 지원하며 DUT 불량 판단 알고리즘을 공통 계층에 고정하지 않는다. 드라이버 적용·검증은 담당자 영역이고 DSN 검증은 앱 Source만 사용한다.
 
 ## 범위와 산출물
 
-| 포함 | 범위 밖 |
+| 포함 | 후속 범위 |
 | --- | --- |
-| C# DSN: RPC 수신, Workspace 실행, 오류 집계, 영속 저장, HTTP View | 실제 C++ 앱·driver/eBPF의 Source 내부 구현 |
-| Workspace 공개 계약, echo/hex 예제 plugin | 업무별 payload 스키마의 공통화 |
-| 동일 RPC 계약의 독립 console Mock, 테스트 Source | production Source SDK, 전달 보장, exactly-once |
-| build/test/publish 및 Docker 배포 구성 | GUI, 임의 record join, 상세 운영 monitoring |
+| C++·Python 앱 SDK, TCP notification 수신, 유한 큐 | 종단 간 ACK/outbox·중앙 자동 동기화 |
+| Workspace plugin, 순서 있는 Filter, sqlite/console/discard Sink | 순환 그래프·시간창 집계·병렬 처리·plugin hot reload |
+| SQLite 원본/결과/View 정의, NDJSON 초기 이전, 재처리 | 자동 보존 기간·DB 분할·운영 규모 부하 인수 |
+| 웹 Presenter, 권한 있는 API, Docker 구성 | TCP 입력 인증/TLS·실제 OS별 운영 인수 |
 
-C# 본체는 `src/`, 테스트는 `tests/Dsn.UnitTests`·`tests/Dsn.IntegrationTests`와 `tests/Dsn.TestSource`에 있다. `prototype/`은 이전 TypeScript 실험 모델이며 현재 제품 구현과 별개다.
+코드는 src/, SDK는 sdk/, 예제는 samples/, 검증은 tests/다. prototype/은 이전 실험 구현이다. 중앙 환경도 같은 데이터/조회 계약으로 확장하되 현재 완료 범위는 로컬 파이프라인이다.
 
 ## 완료 판단
 
-기본 기능의 완료 기준은 실제 RPC 입력이 Workspace를 거쳐 저장되고, 원본 반납 이후와 재시작 이후에도 정의된 View 결과를 얻는 것이다. 실패 시 참조 수명·다음 대상 처리·사용자 조회 범위를 지켜야 한다.
-
-Termux에서 기능 통합 및 publish된 Host/Mock 실행은 검증했다. Docker 배포 구성은 작성됐지만 Linux 컨테이너 실행 인수는 남아 있다. 지연·처리량·운영 가용성의 수치 목표와 평가는 [Architecture Evaluation](06-architecture-evaluation.md)에 별도로 구분한다.
+앱 입력이 원본으로 보존되고 설정 순서대로 처리되어 Sink에 도착해야 한다. 제외된 원본을 새 설정으로 재처리할 수 있고, 재시작 후 ID·값·View 정의가 유지되어야 한다. 잘못된 설정은 시작 전에 거부하고 실패한 처리 이후에도 원본 수명과 후속 입력을 보존한다.

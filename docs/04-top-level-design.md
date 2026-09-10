@@ -2,126 +2,108 @@
 
 ## Structure View
 
-DSN은 한 Host 프로세스 안에 수신, 실행, 해석, 저장, 조회 기능을 조립한다. 화살표는 호출/의존 관계다. record 결과는 조회 요청의 반대 방향으로 반환된다.
-
 ```mermaid
 flowchart LR
-    I["Ingress"] --> R["Runtime<br/>FIFO·대상·원본 수명"]
-    R --> W["Workspace"]
-    W -->|"IRecordStore"| P["Persistence"]
-    V["View / HTTP"] -->|"IRecordQuery·Exporter"| P
-    I -->|"IErrorSink"| D["Diagnostics / Admin"]
-    R -->|"IErrorSink"| D
-    D -->|"관리 record"| P
-    H["Host"] -. "생성·연결·종료" .-> I
-    H -. "생성·연결·종료" .-> R
-    H -. "생성·연결·종료" .-> V
+    S["앱 Source / C++·Python SDK"] --> I["Ingress: framing·검증"]
+    I --> R["Runtime: 유한 FIFO·원본 수명"]
+    R --> A["SQLite: 원본 BLOB"]
+    R --> W["Workspace: 업무 payload 해석"]
+    W --> F["PipelineRouter: 순서 있는 Filters"]
+    F --> K["Sinks: sqlite / console / discard"]
+    K --> DB["SQLite: 결과·field·View"]
+    V["HTTP Presenter"] --> DB
+    V --> A
+    V -->|"권한 있는 replay"| R
 ```
 
-실제 프로젝트 참조는 아래와 같다. 기능 assembly는 Contracts만 참조하고, Host가 생성·연결한다. Mock도 Runtime/Persistence/View에 의존하지 않는다.
+Host가 위 요소를 생성·연결한다. Runtime의 PipelineRouter는 `IRecordStore`를 구현하므로 `EmitAsync`와 기존 `WorkspaceServices.Records` 출력 모두 같은 경로를 탄다. 설정이 없으면 Filter 없이 SQLite로 저장한다. Admin 진단 record는 사용자 Filter를 거치지 않고 SQLite에 저장한다.
 
-```mermaid
-flowchart TB
-    H["Dsn.Host"] --> R["Dsn.Runtime"]
-    H --> I["Dsn.Ingress"]
-    H --> P["Dsn.Persistence"]
-    H --> D["Dsn.Diagnostics"]
-    H --> V["Dsn.View"]
-    M["Dsn.Mock"] --> I
-    R --> C["Dsn.Contracts"]
-    I --> C
-    P --> C
-    D --> C
-    V --> C
-    H --> C
-    M --> C
-    E["samples / Workspaces.Examples"] --> C
-```
-
-최상위는 `DSN.sln`이며 운영 프로젝트 8개, 예제 1개, 테스트 3개로 구성한다. Host는 예제 DLL을 build/publish에 포함하지만 C# 참조는 하지 않고 다른 plugin과 동일하게 동적 로딩한다. [Directory.Build.targets](../Directory.Build.targets)가 허용하지 않은 프로젝트 참조를 빌드 오류로 처리하며, 전이 프로젝트 참조도 비활성화했다. Contracts에는 모듈 경계를 통과하는 모델·인터페이스·이름 규칙만 둔다. JSON 설정과 저장 구현 도우미는 각 구현 assembly 내부에 둔다.
-
-Ingress는 `IMessageSink`, plugin loader는 `IWorkspaceRegistration`, View는 `IRecordQuery`로 연결된다. 내부 원본·queue·호출 context는 Runtime의 internal 타입이며 Host에도 공개하지 않는다. [상세 컴포넌트 구조](05-component-design.md)
+최상위 `DSN.sln`과 기존 프로젝트 경계를 유지한다. 기능 assembly(Runtime, Ingress, Persistence, Diagnostics, View)는 Contracts만 참조하고 Host가 구현을 조립한다. Mock은 Ingress/Contracts에만 의존한다. 예제 Workspace DLL은 동적으로 로딩한다. [Directory.Build.targets](../Directory.Build.targets)가 금지된 프로젝트 참조를 빌드 오류로 처리한다. 새 Filter·SQLite 때문에 프로젝트를 추가하지 않았다.
 
 ## Behavior View
-
-### 메시지 처리와 원본 수명
 
 ```mermaid
 sequenceDiagram
     participant S as Source
-    participant I as Ingress
     participant R as Runtime
-    participant L as Lifetime
+    participant DB as SQLite
     participant W as Workspace
-    participant P as Persistence
-    S->>I: notification
-    I->>I: frame·version·Envelope 검사
-    I->>R: IMessageSink.TrySubmit(InboundMessage)
-    R->>L: 원본 소유권 인계 / root 확보
-    R->>R: FIFO 대기열 → 대상 목록
-    loop 중복을 제거한 대상 순서
-        R->>W: WorkspaceInvocation이 ProcessAsync(context) 호출
-        W->>L: Checkout
-        W->>W: payload 해석·값 복사
-        W->>L: Checkin
-        W->>P: AppendAsync(record)
-        P-->>W: flush 완료
-        R->>L: WorkspaceInvocation이 호출 완료 후 context 정리
+    participant F as Filters
+    participant K as Sinks
+    S->>R: TCP notification → 유한 큐 접수
+    R->>DB: 최초 입력 원본 트랜잭션
+    loop 지정 Workspace 순서
+        R->>W: ProcessAsync(context)
+        W->>W: Checkout → 해석·복사 → Checkin
+        W->>F: await EmitAsync(fields)
+        loop 설정 순서
+            F->>F: 변환 또는 제외(null)
+        end
+        opt 제외되지 않은 결과
+            F->>K: 설정 순서로 AppendAsync
+            K->>DB: sqlite Sink이면 결과 트랜잭션
+        end
+        W-->>R: 모든 작업 완료 → context 정리
     end
-    R->>L: root 반환 / 마지막 참조이면 회수
+    R->>R: root 반환
 ```
 
-없는 대상과 실패한 Workspace는 진단하고 다음 대상으로 진행한다. 앞 Workspace가 Checkin해도 root가 뒤 대상을 위해 원본을 유지한다. Source에 처리 결과를 응답하지 않는다. queue/memory 초과는 TrySubmit 단계에서 신규 입력을 거부한다.
+원본 보존 실패는 해당 dispatch를 중단한다. Workspace/Filter/Sink 실패는 진단하고 다음 대상·메시지 처리를 이어간다. 여러 결과, 여러 Sink, 원본과 결과를 하나의 트랜잭션으로 묶지 않는다. 뒤 Sink가 실패해도 앞 Sink의 성공을 되돌리지 않는다. Source 발행 성공은 로컬 SDK 큐 접수이며 서버 내구 저장 ACK가 아니다.
 
-### 조회와 종료
+Filter는 record 한 건을 한 건 또는 제외로 변환한다. `where`, `scale`, `set`, `select`를 제공하고 `IFilterPlugin`으로 확장한다. Filter마다 독립된 scalar 사본을 전달하고 Workspace scope·시스템 provenance를 보호한다. `pipeline_revision`은 설정과 Filter 타입/assembly 버전의 hash다. 사용자 Filter 변경 시 assembly 버전을 갱신한다.
 
-조회는 사용자 식별 → Workspace scope 확인 → View 정의/field 검증 → Persistence Query → field 투영 순서다. 인증 없는 로컬 모드 외에는 `/health`를 포함한 HTTP 요청에 토큰이 필요하다.
+재처리는 원본 bytes를 같은 FIFO에 다시 제출한다. 원래 `message_id`를 유지하고 `processing_id`, `replay_id`, SQLite `record_id`를 새로 만든다. 원본은 중복 저장하지 않으며 기존 결과도 수정하지 않는다. 재처리 요청 반복은 별도 실행이다.
 
-```mermaid
-flowchart LR
-    A["RPC 접수·session 종료"] --> B["HTTP 중단<br/>Admin timer 중단"]
-    B --> C["Runtime drain"]
-    C --> Q{"제한 시간 내 완료?"}
-    Q -->|"예"| F["최종 Admin 저장<br/>저장소·Host 닫기"]
-    Q -->|"아니오"| D["대기분 폐기<br/>active에 취소 요청"]
-    D --> E["active 실제 반환 대기"]
-    E --> F
-```
-
-원본 안전성을 위해 active 호출의 강제 회수는 하지 않는다. 시작은 설정 검증·저장 복구·plugin 등록 후 Runtime/HTTP/RPC를 열며, 준비 중 실패하면 확보 자원을 정리한다.
-
-실행 범위는 순차 호출로 고정한다. `SequentialScheduler`는 호출 순서만 제어하고 `WorkspaceInvocation`은 ProcessAsync 완료 후 context를 정리한다. Runtime은 전체 dispatch가 끝난 뒤 root를 반환한다. 스케줄러에 원본 해제 권한을 주지 않으며 범용 `IWorkspaceExecutor` 교체 API를 제공하지 않는다. 병렬화는 재진입·순서·완료·drain 계약과 별도 검증을 요구하는 후속 설계다.
+종료는 새 접수를 중단하고 Runtime을 drain한다. 제한 시간이 지나면 대기분을 폐기하고 active 호출에 협력 취소를 요청한 뒤 실제 반환을 기다린다. 원본을 조기 회수하지 않으므로 비협력 plugin의 종료시간 상한은 없다.
 
 ## Deployment View
 
-아래는 목표 Linux 배포다. 실선은 네트워크 또는 파일 접근이다. Termux 검증에서는 컨테이너 없이 같은 DLL을 직접 실행했다.
-
 ```mermaid
 flowchart LR
-    U["원격 사용자"] -->|"HTTPS"| T["TLS reverse proxy<br/>배치 시 별도 구성"]
-    subgraph H["Linux host"]
-        S["Source / 테스트 CLI"] -->|"host 7070"| D["Docker: Dsn.Host<br/>RPC 7070 / HTTP 7071"]
-        T -->|"host 7071"| D
-        D --> F["dsn-data volume<br/>records.ndjson / views.json"]
-        C["설정·plugin 파일"] --> D
+    subgraph PC["시험 PC: 로컬 디스크"]
+        A["테스트·텔레메트리·오케스트레이션 앱"] -->|"loopback TCP 7070"| H["DSN Host"]
+        H --> D["data/dsn.db + WAL"]
     end
+    O["사무 PC 브라우저"] -->|"인증된 HTTP / 배치 시 HTTPS proxy"| H
 ```
 
-[Dockerfile](../Dockerfile)은 .NET SDK로 Host와 예제 plugin을 publish하고 ASP.NET Chiseled Extra runtime에 배치한다. Mock·SDK·소스·디버그 심볼은 이미지에서 제외하며 ICU·시간대 지원과 동적 plugin 로딩은 유지한다. [Compose](../compose.yaml)는 호스트 loopback에만 포트를 공개한다. [Makefile](../Makefile)의 `deploy`는 설정 생성·이미지 빌드·실행, `deploy-image`는 게시된 이미지 실행을 수행한다. 컨테이너 설정은 `bind=0.0.0.0`, `dataDirectory=/data`, 사용자 토큰을 지정한다. 추가 plugin은 경로 설정과 파일 배치가 필요하다. reverse proxy는 Compose에 포함돼 있지 않다.
+HTTP와 입력 TCP의 bind를 분리한다. 원격 View를 열어도 입력은 loopback으로 유지할 수 있다. `/` UI shell만 공개하고 API에는 사용자 토큰·Workspace scope를 적용한다. 원본 조회/재처리는 모든 원래 대상의 권한을 요구한다. 입력 TCP 인증은 제공하지 않는다.
+
+SQLite는 PC별 단일 Host가 소유한다. 결과·원본·사용자 View를 같은 DB에 저장하며 WAL/FULL을 사용한다. Termux에서는 system sqlite3, 일반 .NET 배포에서는 번들 native SQLite를 사용한다. [공급자 구성 근거](https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/custom-versions). WAL은 로컬 디스크 사용을 전제로 한다([SQLite WAL](https://www.sqlite.org/wal.html)). 실행 중 DB 파일 하나만 복사하면 최신 내용을 놓칠 수 있으므로 현재는 Host 정상 종료 후 데이터 디렉터리를 보존한다.
+
+Docker는 target RID의 SQLite native 파일을 포함한 framework-dependent Host를 Chiseled Extra runtime에 배치하고 `/data` volume에 보존한다. Docker 실행은 현재 Termux 검증 범위 밖이다. 중앙 이관·동기화는 구현하지 않았고, 안정적인 `node_id`·`record_id`와 원본 식별자를 향후 공통 조회/이관의 기반으로 남긴다.
 
 ## Design Decision
 
-| ID | 결정과 근거 | 대안·trade-off | 관련 driver |
-| --- | --- | --- | --- |
-| D1 | TCP JSON notification: 언어 독립 fixture와 Mock을 단순하게 공유 | gRPC 등 대신 framing/session을 직접 관리. 완전한 JSON-RPC 아님 | UC1/4, C2 |
-| D2 | 공통 계층의 opaque payload, 버전 decoder와 plugin 분리 | 업무 스키마를 중앙에서 검증하지 못함 | QA7, C3/6 |
-| D3 | 순차 스케줄러·호출 정리·root 소유권 분리: 완료 책임을 명확히 함 | 병렬 교체 API 없음. 느린 plugin/flush의 지연 전파는 유지 | QA1/2/5, C5 |
-| D4 | root와 lease, 유효성 검사 façade: 원본 공유와 반납 후 접근 통제 | Workspace별 복사 대비 수명 관리 비용. 실제 GC 시점은 별개 | QA2/5, C4 |
-| D5 | BCL 기반 append journal: 추가 DB 의존성 없이 flush·재시작 검증 | DB 대비 조회/보존 기능 제한, 동기 flush·메모리 index 비용 | QA4, C1/7 |
-| D6 | ErrorSink와 Admin 변환 분리: 오류 접수가 저장 완료에 의존하지 않음 | snapshot 이력 중복·저장 quota 소모, 완전한 오류 보존 불가 | QA8, UC3 |
-| D7 | record 투영과 사용자별 정의: 저장 모델에서 조회를 분리 | join·실시간 Workspace 상태·Source별 ACL 없음 | QA6, C7 |
-| D8 | 협력 취소 후 active 반환 대기: 사용 중 원본의 조기 회수 방지 | 강제 종료 대비 종료시간 상한 없음 | QA5, C4 |
+| 결정 | 근거 | 비용·한계 |
+| --- | --- | --- |
+| Workspace decoder 뒤 ordered Filter | opaque payload 계약과 기존 plugin 유지, 업무 분석을 조합 | FFmpeg의 임의 그래프·분기·병렬 실행 전체를 구현하지 않음 |
+| SQLite 기본 Sink | 외부 DB 없이 원본/결과/View 트랜잭션과 SQL 페이지 조회 | 단일 writer, native 의존성, 메시지별 저장 비용 |
+| 원본을 Filter 전에 별도 보존 | 제외·실패 데이터도 새 조건으로 재처리 | 디스크 추가 사용, 결과와 원자성 없음 |
+| 논리 quota와 쓰기 거부 | 임의 자동 삭제 없이 보존 범위를 명시 | DB/WAL 물리 크기 상한은 아니며 자동 회전 없음 |
+| legacy 파일 일회성 트랜잭션 이전 | 기존 데이터를 유지하며 새 기본 저장으로 전환 | 초기 이전 시간·여유 공간 필요; 손상 시 전체 롤백 |
+| 순차 실행·명시적 소유권 | Checkout/Checkin·완료·drain 계약 보존 | 느린 Filter/Sink의 지연 전파; 병렬 executor 교체 API 없음 |
+| 동일 로컬 저장/조회 계약 | 단일 PC 사용에 중앙 서버가 필수가 되지 않음 | 중앙 통합·전송 보장은 별도 후속 구현 |
 
-| D9 | 기능별 assembly와 Contracts 의존 강제: 구현 간 우발적 결합 방지 | 프로젝트 수 증가, Host의 명시적 조립/예제 패키징 필요 | QA7, C6/7 |
+## 후속 배포 옵션: 망 분리 환경의 사무 PC 열람 (미구현)
 
-선택의 타당성과 잔여 위험은 [Architecture Evaluation](06-architecture-evaluation.md)에서 위 driver에 연결해 평가한다.
+2026-09-10 요구: 시험 PC와 사무 PC 사이 네트워크 연결이 차단될 수 있다. 직접 웹 접속은 허용된 경로가 있을 때만 사용하며, 차단 환경의 기본 후속 옵션은 DB snapshot을 승인된 파일 반출 경로로 옮겨 사무 PC에서 열람하는 방식이다.
+
+```mermaid
+flowchart LR
+    subgraph T["시험 PC"]
+        C["Collector + Pipeline"] --> DB["운영 SQLite"]
+        DB --> E["일관된 snapshot 내보내기"]
+    end
+    E --> F["독립된 .db 파일"]
+    F -->|"승인된 파일 이관"| R["사무 PC: DSN Viewer"]
+    R -->|"127.0.0.1 HTTP"| B["사무 PC 브라우저"]
+```
+
+권장 구현은 기존 Host의 **viewer 모드**로 시작한다. 별도 프로젝트를 늘리지 않고 같은 View/API/Presenter를 재사용하며, 실행 경로에서 Ingress·Runtime·plugin·Admin writer·자동 이전을 생성하지 않는다. SQLite는 읽기 전용으로 열고 HTTP는 loopback만 사용한다. 원본 재처리와 입력 API는 제공하지 않으며, 열람 중 View 편집 설정은 원본 DB와 별도 사용자 파일에 저장한다. 기록된 Workspace/field를 DB에서 발견하므로 결과 열람에 업무 plugin이 필요 없어야 한다. 기존 DB의 사용자별 View는 별도의 명시적 선택으로 읽고, snapshot에 접근 가능한 사용자는 반출된 DB 전체를 읽을 수 있다는 파일 배포 경계를 따른다.
+
+사무 PC에는 OS에 맞는 Viewer를 한 번 배포하고 이후 데이터 전달은 DB 파일만으로 가능하게 한다. 외부 CDN·인터넷 설치 없이 UI를 포함한 실행 묶음을 제공한다. 브라우저가 SQLite 파일을 직접 여는 구현은 별도 대안이며 우선 채택하지 않는다. 먼저 사무 PC OS와 로컬 실행/loopback 허용 여부를 확인해야 한다.
+
+Snapshot은 SQLite Online Backup API 등으로 운영 DB에서 독립된 파일을 생성한다([SQLite Backup](https://www.sqlite.org/backup.html)). WAL 사용 중 운영 .db 하나만 복사하는 방식은 사용하지 않는다([WAL](https://www.sqlite.org/wal.html)). 임시 출력 → 무결성 검사 → 완료 파일 확정 순서로 불완전한 반출을 막는다. DB 내부에 schema 버전·원래 node_id·snapshot ID·생성 시각을 보존하고, 완료 전 오류 시 기존 snapshot을 덮어쓰지 않는다. 라이브 snapshot은 완료된 DB 트랜잭션 기준이며 큐 안의 입력이나 처리 중인 결과까지 완료했다는 뜻은 아니다. 완결된 시험 구간이 필요하면 Source 중단·Runtime drain 뒤 생성한다.
+
+Viewer는 원본 node_id/record_id를 유지하며 새 수집 PC처럼 사용하지 않는다. 여러 PC 파일은 우선 선택하여 개별 열람하고, 병합·통합 cursor·중복 제거는 이후 별도 항목으로 둔다. snapshot 조회는 반출 시점 데이터이며 실시간 원격 조회가 아니다. 현재 Host는 수집·관리 기록·DB 변경을 포함하므로 읽기 전용 Viewer의 대체물로 안내하지 않는다.

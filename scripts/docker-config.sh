@@ -15,9 +15,10 @@ fi
 (set -o noclobber; umask 022; cat > settings.docker.json <<EOF
 {
   "bind": "0.0.0.0",
+  "ingressBind": "0.0.0.0",
   "dataDirectory": "/data",
   "users": {
-    "operator": { "token": "$token", "workspaces": ["echo", "hex"] }
+    "operator": { "token": "$token", "workspaces": ["echo", "hex", "bench"] }
   }
 }
 EOF

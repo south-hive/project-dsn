@@ -1,71 +1,89 @@
 # DSN
 
-다양한 Source의 메시지를 수신하고 Workspace에서 해석·저장하여 사용자별 View로 제공하는 C#/.NET 10 서버다. Source는 테스트용 CLI만 포함하며, 실제 앱·driver/eBPF의 내부 발행 코드는 범위 밖이다.
+앱 Source가 보내는 다양한 payload를 **Source → Filter → Sink**로 처리하는 C#/.NET 10 프로그램이다. 로컬 PC에서 수집·원본 보존·Workspace 해석·조건 처리·SQLite 저장·웹 조회·재처리까지 실행한다. C++·Python Source SDK와 C# Workspace/Filter 계약을 제공한다. 검증은 앱 Source 기준이며 드라이버 연동은 담당자 영역이다.
 
-[아키텍처 문서](docs/README.md): Project Overview → System Overview → Architectural Drivers → Top Level Design → Component Level Design → Architecture Evaluation.
+## 릴리즈로 실행
 
-## 실행과 검증
+[GitHub Releases](https://github.com/south-hive/project-dsn/releases)의 portable ZIP은 Host·웹 UI·Mock·SQLite native 파일·앱 예제·Python/C# SDK를 포함한다. ASP.NET Core Runtime 10 또는 .NET SDK 10을 설치한 뒤 압축을 풀고 `dotnet host/Dsn.Host.dll settings.pipeline.json`으로 실행한다. 런타임은 포함하지 않으며 Termux 외 OS 실행 검증은 아직 하지 않았다. 상세 실행·제약은 릴리즈 노트를 따른다.
 
-```bash
-# Termux
-pkg install dotnet-sdk-10.0 make
-make check
-# 터미널 1: TCP 입력 7070 / HTTP 7071
-dotnet run --project src/Dsn.Host -c Release --no-build
-# 터미널 2
-dotnet run --project tests/Dsn.TestSource -c Release --no-build -- 7070 hello 3
-curl 'http://127.0.0.1:7071/view?workspaces=echo,hex&fields=id,workspace,payload_utf8,payload_hex'
+## 로컬 실행
+
+```sh
+# Termux 환경 준비
+pkg install dotnet-sdk-10.0 make libsqlite
+make check DSN_BUILD_JOBS=1
+# 터미널 1: 필터 예제와 웹 Presenter
+make pipeline-host DSN_BUILD_JOBS=1
+# 터미널 2: telemetry-app / test-app / orchestrator 합성 Source
+make bench-sources
 ```
 
-설정 파일은 Host의 첫 인자로 전달한다. 기본값은 [settings.example.json](settings.example.json), API는 [System Overview](docs/02-system-overview.md)에 있다. 기본 바인딩은 loopback, 종료는 Ctrl+C/SIGTERM이다.
+브라우저에서 `http://127.0.0.1:7071/` → 연결 → bench → 처음 조회를 선택한다. 화면에 현재 처리 경로가 표시된다. [로컬 파이프라인 설정과 규칙](samples/pipeline/README.md), [여러 앱 Source 예제](samples/bench/README.md).
 
-```bash
-# 독립 Mock: 동일 RPC 입력의 envelope와 hex 출력
-dotnet run --project src/Dsn.Mock -c Release --no-build -- 7072
-# 배포용 DLL 생성
+```mermaid
+flowchart LR
+    S["앱 Source"] --> C["수신·유한 큐"]
+    C --> R["SQLite 원본"]
+    C --> W["Workspace<br/>payload 해석"]
+    W --> F["Filter 목록<br/>where → scale → set → select"]
+    F --> K["Sink<br/>sqlite / console / discard"]
+    K --> V["웹 조회"]
+    R -->|"재처리"| W
+```
+
+Source의 `workspace`가 처리 경로를 선택한다. 설정이 없으면 기존처럼 Workspace 결과를 저장한다. 다음 설정처럼 순서를 연결할 수 있다.
+
+```json
+{"pipelines":{"bench":{"filters":[
+  {"type":"scale","options":{"field":"value_latency_us","output":"latency_ms","factor":0.001}},
+  {"type":"where","options":{"field":"latency_ms","op":"gte","value":0.09}}
+],"sinks":["sqlite"]}}}
+```
+
+Source publish 성공은 로컬 큐 접수이며 서버 저장 ACK가 아니다. 필터로 제외한 기록도 `retainRaw=true`이면 원본이 남는다. 재처리는 현재 설정으로 새 결과를 추가하고 `message_id`, `replay_id`, `pipeline_revision`으로 원본·실행·설정을 구분한다. SQLite가 부여하는 `node_id`/`record_id`는 재시작 뒤에도 유지된다.
+
+## 저장과 기존 데이터
+
+기본 저장은 데이터 디렉터리의 `dsn.db`다. 원본 BLOB, 결과 JSON field, field 목록, View 정의를 SQLite에 보관한다. WAL + FULL 동기화, 단일 DSN 소유, SQL 페이지 조회를 사용한다. 수신 원본과 결과는 별도 트랜잭션이며 다중 Sink 간 원자성은 없다.
+
+기존 `records.ndjson`, `raw.ndjson`, `views.json`은 최초 시작에 한 번만 가져오며 원본 파일을 그대로 둔다. 이전 실패는 전체 롤백한다. 이전 후 기준 저장소는 SQLite다. 정상 종료한 뒤 데이터 디렉터리 전체를 백업한다. 가동 중 `dsn.db` 하나만 복사하지 않는다.
+
+`journalBytes`와 `rawBytes`는 각각 결과·원본의 논리 데이터 상한이고 DB/WAL 파일 크기 상한은 아니다. 용량 초과는 진단하며 자동 삭제·기간별 회전·중앙 자동 동기화는 아직 제공하지 않는다.
+
+## 설정과 사무 PC 접속
+
+Host의 첫 인자로 설정 파일을 전달한다. [settings.example.json](settings.example.json)이 기본값이다.
+
+```sh
+dotnet run --project src/Dsn.Host -c Release --no-build -- settings.example.json
+```
+
+`bind`는 웹, `ingressBind`는 TCP 입력 주소이며 기본은 모두 loopback이다. 사무 PC에서 접속하려면 웹 주소와 `users`의 토큰·Workspace 권한을 설정하고 네트워크/HTTPS reverse proxy를 준비한다. 웹을 공개해도 TCP 입력은 기본적으로 로컬에 남는다. 재처리 권한은 `canReplay=true`로 별도 부여한다. 중앙 수신기로 같은 Host를 배치할 수 있지만 현재 TCP 입력에는 인증/TLS가 없으며 로컬과 중앙 간 자동 복제도 없다.
+
+웹은 field 선택·현재 페이지 Source 필터·숫자 추세·JSON 다운로드·원본 확인·단건 재처리를 제공한다. 차트는 전체 이력 집계가 아닌 현재 페이지의 저장 순서다. [HTTP API](docs/02-system-overview.md).
+
+네트워크가 차단된 사무 PC에서는 직접 접속 대신 **DB snapshot 이관 → 사무 PC의 읽기 전용 Viewer → localhost 웹**을 후속 옵션으로 계획한다. 현재 Host에는 조회 전용 모드가 없으며 아직 구현된 기능은 아니다. [망 분리 열람 설계](docs/04-top-level-design.md#후속-배포-옵션-망-분리-환경의-사무-pc-열람-미구현), [단일 PC 우선 과제](docs/06-architecture-evaluation.md#단일-pc-우선-과제-2026-09-10-미구현-backlog).
+
+## SDK와 개발
+
+[SDK 안내](sdk/README.md), [Workspace·Filter 개발](sdk/workspace/README.md). payload 스키마는 Source와 해당 Workspace가 합의하며 공통 서버에 업무 의미를 강제하지 않는다. 새 Workspace는 `EmitAsync`로 독립 field를 출력한다. 기존 `WorkspaceServices.Records` 직접 저장도 동일 Filter/Sink 경로를 거친다.
+
+```sh
+make sample-host       # temperature Workspace
+make sample-python     # Python 앱 예제
+make sample-cpp        # C++ 앱 예제
+make sdk-check         # 앱 SDK·외부 NuGet plugin 연동 검사
+make pipeline-check DSN_BUILD_JOBS=1
+make bench-check DSN_BUILD_JOBS=1
 make publish
-dotnet artifacts/host/Dsn.Host.dll settings.example.json
 ```
 
-## Docker
+기본 C++ SDK 대상은 Linux/Termux다. `make check`는 C# 검사이며 `tests/presenter.mjs`의 선택적 브라우저 검사 방법은 [tests/README.md](tests/README.md)에 있다. 현재 실행은 순차이며 수천 PC 부하 인수는 별도다.
 
-Docker Engine과 Compose v2가 있는 Linux에서 실행한다. 이미지는 Host와 예제 plugin만 포함하며, Mock·SDK·소스·디버그 심볼은 제외한다. 런타임은 shell/패키지 관리자가 없는 [ASP.NET Chiseled Extra](https://github.com/dotnet/dotnet-docker/blob/main/documentation/image-variants.md)를 사용하여 ICU·시간대 지원을 유지한다. 동적 plugin 로딩을 위해 trimming/AOT는 사용하지 않는다.
+## Docker / CI
 
-```bash
-make deploy       # 최초 설정 생성 → 이미지 빌드 → 백그라운드 실행
-make ps
-make logs
-make down         # 데이터 volume 유지
-```
+Linux Docker Engine + Compose v2에서 `make deploy`, `make logs`, `make down`을 사용한다. `make docker-config`는 임의 토큰과 echo/hex/bench 권한을 가진 `settings.docker.json`을 처음 한 번 생성한다. 기존 파일은 보존하며 컨테이너 포트 전달에는 `ingressBind=0.0.0.0`이 필요하다. 생성 파일의 토큰은 HTTP Bearer로 전달한다.
 
-`make docker-config`는 `settings.docker.json`에 `bind=0.0.0.0`, `dataDirectory=/data`, 임의의 64자리 토큰을 가진 `operator` 사용자(echo/hex 권한)를 생성한다. 기존 파일은 보존한다. 필요하면 배포 전에 이 명령을 먼저 실행하고 설정을 편집한다. HTTP 요청에는 파일에 저장된 토큰을 `Authorization: Bearer <token>`으로 보낸다. 설정 파일은 컨테이너 사용자가 읽을 수 있어야 하며 Git과 이미지 빌드 컨텍스트에서 제외된다.
+이미지는 Host·plugin과 대상 아키텍처의 SQLite native library를 포함하고 SDK·Mock·소스·PDB는 제외한다. ASP.NET Chiseled Extra runtime을 사용한다. Compose는 호스트 loopback에만 포트를 열고 `/data` volume을 보존한다. 외부 웹 공개는 별도 HTTPS proxy가 필요하다. Docker build/run 자체는 이 Termux 검증에 포함하지 않는다.
 
-Compose는 호스트 loopback에 7070/7071만 공개하고 `dsn-data` volume에 record와 View 정의를 유지한다. 외부 HTTP 노출에는 별도 TLS proxy를 구성한다. [배포 구조](docs/04-top-level-design.md#deployment-view)
-
-## Build / CI / CD
-
-로컬과 CI에서 같은 [Makefile](Makefile) 명령을 사용한다. 검증·publish는 기존 `scripts/check.sh`, `scripts/publish.sh`를 재사용하며, 이 스크립트를 직접 실행해도 된다.
-
-| 명령 | 동작 |
-| --- | --- |
-| `make` | 전체 명령 목록 |
-| `make build` | Release 빌드 |
-| `make check` | 빌드 + 전체 테스트 (`make test`도 동일) |
-| `make publish` | `artifacts/host`, `artifacts/mock`에 배포 파일 생성 |
-| `make docker-build` | Host Docker 이미지 빌드 |
-| `make ci` | 테스트 성공 후 Docker 이미지 빌드 |
-| `make deploy` | 최초 설정 생성 + 이미지 빌드 + Compose 실행 |
-| `make down` | Compose 종료, 데이터 volume 보존 |
-
-```bash
-make ci IMAGE=ghcr.io/OWNER/dsn:COMMIT        # 테스트 성공 후 이미지 빌드
-make docker-push IMAGE=ghcr.io/OWNER/dsn:COMMIT  # registry 로그인 후 게시
-# 배포 서버: 게시한 동일 이미지 실행
-make deploy-image IMAGE=ghcr.io/OWNER/dsn:COMMIT
-```
-
-CI는 .NET 10 SDK·Make·Bash·Docker, 배포 서버는 Make·Bash·Docker Compose v2가 필요하다. `IMAGE` 기본값은 `dsn:local`이다. `deploy`는 소스에서 빌드하고, `deploy-image`는 지정한 이미지를 가져온다. 두 명령 모두 현재 Docker context에 컨테이너를 재생성하여 설정 변경도 적용한다. 자동 배포 트리거나 서버 접속 설정은 포함하지 않는다.
-
-검증된 환경은 Termux SDK 10.0.111 / runtime 10.0.11이다. Docker 실행은 미검증이며, 구체적인 통과 범위와 한계는 [Architecture Evaluation](docs/06-architecture-evaluation.md)에 기록했다. 이전 TypeScript 실험은 `prototype/`에 보존한다.
-
-솔루션은 `DSN.sln`이다. 기능 프로젝트는 `Dsn.Contracts`만 참조하며 빌드에서 의존 경계를 검사한다. 예제 plugin은 `samples/Dsn.Workspaces.Examples`, 단위·통합 테스트는 각각 `tests/Dsn.UnitTests`, `tests/Dsn.IntegrationTests`에 있다.
+`make ci`는 검사 후 Docker build, `make docker-push IMAGE=...`는 이미지 push, `make deploy-image IMAGE=...`는 게시된 이미지 실행이다. [아키텍처 문서](docs/README.md)는 Project Overview → System Overview → Architectural Drivers → Top Level Design → Component Design → Architecture Evaluation 순서다.

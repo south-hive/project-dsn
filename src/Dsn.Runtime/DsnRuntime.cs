@@ -12,17 +12,19 @@ public sealed class DsnRuntime : IMessageSink, IWorkspaceRegistration, IAsyncDis
     private readonly SemaphoreSlim wake = new(0);
     private readonly CancellationTokenSource processing = new();
     private readonly IErrorSink errors;
+    private readonly IRawArchive? archive;
+    public string[] Workspaces => registry.Names;
     private Task? loop;
     private bool stopping, activeMessage, disposed;
     public LifetimeStats LifetimeStats => lifetime.Stats;
 
     public DsnRuntime(IErrorSink errors, int capacity = 1024, long maxQueueBytes = 16 * 1024 * 1024,
-        int maxMessages = 4096, long maxLiveBytes = 64 * 1024 * 1024)
+        int maxMessages = 4096, long maxLiveBytes = 64 * 1024 * 1024, IRawArchive? archive = null, IRecordStore? results = null)
     {
         if (capacity < 1 || maxQueueBytes < 1 || maxMessages < 1 || maxLiveBytes < 1) throw new ArgumentOutOfRangeException(nameof(capacity));
-        this.errors = errors;
+        this.errors = errors; this.archive = archive;
         lifetime = new(maxMessages, maxLiveBytes);
-        registry = new(errors);
+        registry = new(errors, results);
         queue = new(capacity, maxQueueBytes);
     }
     public bool Register(IWorkspace workspace)
@@ -64,7 +66,17 @@ public sealed class DsnRuntime : IMessageSink, IWorkspaceRegistration, IAsyncDis
                 message = queue.Take(); activeMessage = true;
             }
             // The root belongs to this dispatch, never to a scheduling strategy or plugin.
-            try { await scheduler.RunAsync(registry.Resolve(message), processing.Token); }
+            try
+            {
+                if (archive is not null && message.ReplayId is null)
+                    await archive.AppendAsync(message.Id, new(message.Envelope, message.Read(b => b.ToArray())) { ReceivedAt = message.ReceivedAt }, processing.Token);
+                await scheduler.RunAsync(registry.Resolve(message), processing.Token);
+            }
+            catch (Exception e)
+            {
+                // When enabled, archive must succeed before processing: no silent loss of replay evidence.
+                errors.Report(new("RAW_STORAGE_FAILED", "collector", message.Envelope.SourceId, Detail: e.GetType().Name));
+            }
             finally
             {
                 message.Release();

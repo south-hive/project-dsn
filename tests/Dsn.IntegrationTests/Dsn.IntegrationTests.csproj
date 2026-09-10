@@ -9,6 +9,7 @@
     <ProjectReference Include="../../src/Dsn.View/Dsn.View.csproj" />
     <ProjectReference Include="../../src/Dsn.Host/Dsn.Host.csproj" />
     <ProjectReference Include="../../samples/Dsn.Workspaces.Examples/Dsn.Workspaces.Examples.csproj" />
+    <ProjectReference Include="../../samples/temperature/Dsn.Workspaces.Temperature/Dsn.Workspaces.Temperature.csproj" />
     <Compile Include="../TestSupport/*.cs" Link="TestSupport/%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

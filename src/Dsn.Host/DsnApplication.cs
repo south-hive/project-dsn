@@ -12,7 +12,9 @@ namespace Dsn.Host;
 public sealed class DsnApplication : IAsyncDisposable
 {
     private readonly Settings settings;
-    private readonly JournalStore store;
+    private readonly SqliteStore store;
+    private readonly IRawArchive? archive;
+    public PipelineRouter Pipeline { get; }
     private readonly AdminWorkspace admin;
     private readonly CancellationTokenSource adminStop = new();
     private readonly WebApplication web;
@@ -26,25 +28,29 @@ public sealed class DsnApplication : IAsyncDisposable
     {
         settings.Validate(); this.settings = settings;
         Errors = new(settings.ErrorCapacity);
-        store = new(Path.Combine(settings.DataDirectory, "records.ndjson"), settings.JournalBytes, settings.RecordCapacity);
-        Runtime = new(Errors, settings.QueueCapacity, settings.QueueBytes, settings.MaxMessages, settings.LiveBytes);
+        store = new(Path.Combine(settings.DataDirectory, "dsn.db"), settings.JournalBytes, settings.RecordCapacity, settings.RawBytes, settings.RawCapacity);
+        try { store.ImportLegacy(settings.DataDirectory); } catch { store.Dispose(); throw; }
+        archive = settings.RetainRaw ? store : null;
+        Pipeline = new(store, Errors, new ConsoleSink());
+        Runtime = new(Errors, settings.QueueCapacity, settings.QueueBytes, settings.MaxMessages, settings.LiveBytes, archive, Pipeline);
         Ingress = new(new NotificationProtocol(settings.PayloadBytes), Runtime, Errors, settings.MaxSessions, settings.FrameBytes);
         admin = new(Errors, store);
         try
         {
-            var services = new WorkspaceServices(store, Errors);
+            var services = new WorkspaceServices(Pipeline, Errors);
             var loader = new PluginLoader();
             var plugins = settings.Plugins.Length == 0
                 ? new[] { Path.Combine(AppContext.BaseDirectory, "plugins", "Dsn.Workspaces.Examples.dll") }
                 : settings.Plugins;
-            foreach (var path in plugins) loader.Load(path, Runtime, services);
-            var definitions = new ViewDefinitions(Path.Combine(settings.DataDirectory, "views.json"));
+            foreach (var path in plugins) loader.Load(path, Runtime, services, filters: Pipeline);
+            Pipeline.Configure(settings.Pipelines, Runtime.Workspaces);
+            var definitions = new ViewDefinitions(store);
             var view = new ViewService(store);
             var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { Args = [], ApplicationName = typeof(DsnApplication).Assembly.FullName });
             builder.Logging.ClearProviders();
             builder.WebHost.ConfigureKestrel(o => { o.Limits.MaxRequestBodySize = 16384; o.Listen(System.Net.IPAddress.Parse(settings.Bind), settings.ViewPort); });
             web = builder.Build();
-            web.MapViewEndpoints(settings, store, view, definitions);
+            web.MapViewEndpoints(settings, store, view, definitions, archive, Runtime, Pipeline);
         }
         catch { store.Dispose(); throw; }
     }
@@ -52,7 +58,7 @@ public sealed class DsnApplication : IAsyncDisposable
     {
         try
         {
-            Runtime.Start(); await web.StartAsync(); Ingress.Start(settings.Bind, settings.RpcPort);
+            Runtime.Start(); await web.StartAsync(); Ingress.Start(settings.IngressBind, settings.RpcPort);
             adminLoop = Task.Run(async () =>
             {
                 using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
@@ -78,5 +84,15 @@ public sealed class DsnApplication : IAsyncDisposable
         await Runtime.DisposeAsync();
         try { await admin.PublishAsync(); } catch (IOException) { Console.Error.WriteLine("DSN final Admin snapshot could not be stored."); }
         store.Dispose(); await web.DisposeAsync(); adminStop.Dispose();
+    }
+}
+
+internal sealed class ConsoleSink : IRecordStore
+{
+    public ValueTask AppendAsync(RecordInput record, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Console.Error.WriteLine(System.Text.Json.JsonSerializer.Serialize(record));
+        return ValueTask.CompletedTask;
     }
 }

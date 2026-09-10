@@ -1,50 +1,50 @@
 # 2. System Overview
 
-## 시스템 경계
-
-Source는 DSN에 메시지를 발행하고 사용자는 저장된 결과를 조회한다. Mock은 Source 연동 시험용 대체 수신기다. 아래 화살표는 외부 요청과 결과 데이터 흐름이다.
+## 경계와 데이터
 
 ```mermaid
 flowchart LR
-    S["Source<br/>시험 프로그램·장치"] -->|"TCP notification"| D["DSN<br/>수집·해석·저장"]
-    S -->|"대체 목적지"| M["독립 Mock<br/>console echo"]
-    U["평가자·관리자"] -->|"HTTP 조회·View 정의"| D
-    D -->|"선택된 field·export"| U
-    D -->|"record·View 정의"| F["파일 저장소"]
+    S["앱 Source / SDK"] --> D["로컬 DSN<br/>수집·처리·SQLite"]
+    B["사무 PC 브라우저"] -->|"HTTP API / 웹"| D
+    D --> F["dsn.db + WAL<br/>원본·결과·View"]
 ```
-
-현재 테스트 Source는 network write를 기다리는 CLI다. notification에 응답이 없다는 사실은 원래 시험 프로그램의 비대기 발행을 보장하지 않는다.
-
-## 데이터와 외부 인터페이스
 
 | 개념 | 의미 |
 | --- | --- |
-| Envelope | `version`, `source_id`, 선택적 `source_description`, `time`, `event_type`, 대상 `workspace[]` |
-| Payload | Source와 Workspace가 의미를 합의한 불투명 bytes |
-| Workspace | payload를 해석하여 scalar field의 record를 만드는 plugin |
-| Record | 저장소가 부여한 id, Workspace 이름, field 값. 원본과 독립 |
-| View | 허용된 Workspace의 record에서 선택할 field를 정의. 사용자별 보존 |
+| Envelope | version, source_id, source_description, time, event_type, workspace[] |
+| Payload | Source와 Workspace가 의미를 합의한 opaque bytes |
+| Workspace | payload를 scalar field로 해석하는 첫 Filter |
+| Pipeline | Workspace별 후속 Filter 순서와 Sink 목록 |
+| Raw | message_id·수신 시각·Envelope·payload BLOB |
+| Record | Workspace·field와 저장 ID. SQLite가 node_id/record_id 부여 |
+| View | 허용 Workspace의 선택 field. 같은 API/정의로 조회 |
 
-입력 전송은 UTF-8 JSON 한 개와 LF를 보내는 `dsn.publish` notification이다. 완전한 JSON-RPC 서버가 아니며 request/id/batch를 지원하지 않는다. transport 상태는 관찰 가능하지만 메시지 처리·저장 응답은 없다.
+입력은 UTF-8 JSON+LF의 dsn.publish notification이다. 완전한 JSON-RPC 서버가 아니며 request/id/batch는 지원하지 않는다. Source publish의 true는 로컬 큐 접수, DSN TrySubmit의 true는 수용 결과이며 저장 완료 ACK가 아니다.
 
 ```json
-{"jsonrpc":"2.0","method":"dsn.publish","params":{"version":1,"source_id":"sample","time":"2026-09-08T00:00:00Z","event_type":"normal","workspace":["echo","hex"],"payload":"aGVsbG8="}}
+{"jsonrpc":"2.0","method":"dsn.publish","params":{"version":1,"source_id":"app-1","time":"2026-09-09T00:00:00Z","event_type":"normal","workspace":["bench"],"payload":"e30="}}
 ```
 
-| HTTP API | 기능 |
-| --- | --- |
-| `GET /health`, `GET /fields` | 준비 상태, 접근 가능한 저장 field 목록 |
-| `GET /view?workspaces=echo,hex&fields=id,workspace,payload_utf8,payload_hex` | 선택한 field 조회 |
-| `GET /export?workspaces=echo` | 원래 record의 NDJSON export |
-| `PUT /views/{name}` | `{"workspaces":["echo"],"fields":["id","payload_utf8"]}` 정의 저장 |
-| `GET /views`, `GET /views/{name}` | 자기 정의 목록, 정의에 따른 결과 조회 |
+## API
 
-조회와 export는 `afterId`와 `limit`으로 페이지를 지정한다. View 조합은 여러 record를 동일 column 집합에 투영하는 방식이다. 같은 입력에서 파생된 echo/hex record는 `message_id`가 같지만 자동 join하지 않는다.
+| 경로 | 동작 |
+| --- | --- |
+| GET / | 공개된 빈 웹 UI. 데이터는 인증된 API로만 접근 |
+| GET /health | 준비 상태 |
+| GET /workspaces, /fields | 허용 Workspace·저장 field 목록 |
+| GET /pipelines | 허용 처리 경로의 Filter/Sink 이름과 revision |
+| GET /view?workspaces=bench&fields=id,role | 선택 field 조회. afterId/limit 페이지 |
+| GET /export?workspaces=bench | 저장 결과 NDJSON export |
+| GET /views, /views/{name}; PUT /views/{name} | 사용자별 View 정의 조회·저장 |
+| GET /raw?afterId=0&limit=20 | 원본과 nextAfterId. limit 1–100 |
+| POST /raw/{id}/replay | {"workspaces":["bench"]}를 기존 큐로 제출, 202 접수·503 포화 |
+
+원본은 원래 대상 Workspace 모두의 권한이 필요하다. 원본 페이지의 cursor는 보이지 않는 항목도 넘어가므로 빈 items만으로 끝을 판단하지 않는다. 재처리는 canReplay 권한을 추가로 확인한다. 원본 보존 off는 원본 API 409, 무인증 401, 범위 밖 요청 403이다. 반복 재처리 요청은 별도 실행이며 결과를 추가한다.
+
+웹의 Source 필터와 차트는 현재 페이지에만 적용된다. 저장 ID 순서이며 join·전체 이력 집계는 제공하지 않는다.
 
 ## 운영 환경
 
-기본 TCP 입력/HTTP 포트는 7070/7071, Mock은 7072다. 기본 바인딩은 loopback이며 인증 없는 로컬 조회를 허용한다. 원격 바인딩은 사용자별 bearer token과 허용 Workspace 설정을 요구한다. HTTP를 외부에 노출하는 배치는 TLS reverse proxy를 전제로 한다. Source별 ACL과 TCP 입력 인증은 구현하지 않았다.
+bind는 웹, ingressBind는 TCP이며 기본 loopback이다. 원격 웹 bind는 사용자 토큰·Workspace 권한을 요구하고 HTTPS proxy는 배치에서 구성한다. TCP 입력에는 인증/TLS가 없으므로 신뢰 경계가 필요하다. 기본 포트는 7070/7071, Mock은 7072다.
 
-설정은 JSON 파일 하나 또는 코드 기본값을 사용한다. 상대 경로는 실행 디렉터리 기준이고 알 수 없는 키·잘못된 범위는 시작 시 거부한다. 상세 기본값은 [settings.example.json](../settings.example.json), 검증 규칙은 [Settings.cs](../src/Dsn.Host/Settings.cs)가 기준이다.
-
-기존 설정 키 `rpcPort`, ready 출력의 `rpcPort`, wire의 `jsonrpc`/`dsn.publish`와 오류 코드는 호환성을 위해 유지한다. 구현 명칭은 `TcpNotificationReceiver`와 `NotificationProtocol`이며 범용 RPC 서비스를 의미하지 않는다.
+SQLite는 데이터 디렉터리에 한 DSN만 접근한다. 기존 journal/view 파일은 최초에 한 번만 이전하며 그대로 보존한다. 상한은 논리 byte/record 수이며 파일 크기 제한·자동 삭제가 아니다. [기본 설정](../settings.example.json), [실행 예제](../samples/pipeline/README.md).

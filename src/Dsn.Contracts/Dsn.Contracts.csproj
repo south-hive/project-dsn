@@ -1,1 +1,7 @@
-<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup></PropertyGroup><ItemGroup></ItemGroup></Project>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Dsn.Contracts</PackageId>
+    <PackageVersion>0.1.0</PackageVersion>
+    <Description>DSN Workspace plugin API: payload leases, record storage and diagnostics.</Description>
+  </PropertyGroup>
+</Project>

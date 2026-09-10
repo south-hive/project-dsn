@@ -1,15 +1,27 @@
-# DSN tests
+# DSN 검증
 
-검증 범위와 합격 조건은 [테스트 계획](plan.md), 최신 판정은 [결과](report.md), 재현된 문제는 [결함 목록](defects.md)에 기록한다. 테스트 코드는 `prototype/test/`에 유지한다.
+저장소 루트에서 실행한다. 실제 드라이버 연동·시험은 포함하지 않는다.
 
-최초 실행 전 `prototype/`에서 `npm ci`로 고정 의존성을 설치한다. 저장소 루트에서 다음 명령을 실행한다.
+| 명령 | 범위 |
+| --- | --- |
+| `make check` | C# Release build, 단위 17 + 통합 10개 그룹 |
+| `make sdk-check` | C# 검사·SDK 패키징·SDK 검사 6개 |
+| `make pipeline-check` | C# 검사 + 앱 Source → ordered Filters → SQLite·조건 변경 replay·재시작 |
+| `make bench-check` | C# 검사 + 세 Python 앱 프로세스 수집·원본·재시작 |
+| `make ci` | C#·SDK 검사 성공 후 Docker 이미지 빌드 |
 
-```bash
-node tests/run.mjs
+작은 PC/Termux에서는 `DSN_BUILD_JOBS=1`을 지정한다. 로컬 HTTP 검사는 환경 프록시를 우회한다.
+
+[SDK 검사](sdk/test_sources.py)는 binary/복사·포화·전송 실패·종료·동시 발행과 C++·Python → 실제 Host → Workspace → HTTP/재시작을 확인한다. Python wheel, 설치 CMake library, Contracts NuGet을 별도 소비 프로젝트에서 사용한다. `tests/pipeline.py`는 제외된 원본의 재처리, 안정적인 ID와 변경 revision, SQLite BLOB까지 검사한다.
+
+선택적 브라우저 검사:
+
+```sh
+npm install --prefix artifacts/browser-tools playwright
+artifacts/browser-tools/node_modules/.bin/playwright install chromium
+python tests/bench.py --browser
 ```
 
-빌드, Verification 27건, Validation 19건씩 3회, 데모를 실행한다. 예상 시험 수와 pass/fail/skip/cancelled/todo를 검사하며 실패 또는 단계별 60초 timeout 시 exit 1이다. 시험 추가 시 실행 도구의 예상 건수도 갱신한다. Validation 반복은 간헐적인 연결·종료 실패를 찾기 위한 것이며 성능 측정이 아니다.
+`DSN_BROWSER_EXECUTABLE`로 별도 Chromium 경로를 지정할 수 있다. Workspace·처리 경로, 페이지 Source 필터/차트, 다운로드, 원본 재처리, 모바일 가로 넘침을 확인한다. 스크린샷은 `artifacts/presenter-*.png`에 생성한다.
 
-각 실행의 `results/<UTC시각-pid>/summary.json`에 환경, commit, 작업 트리 상태, 소스 SHA256, 명령·종료 코드·판정을 기록한다. 단계별 stdout/stderr는 같은 폴더에 보존한다. 이 폴더는 Git에서 제외되며 검토용 요약·결함 문서는 추적한다. 실패 로그를 덮어쓰지 않는다.
-
-단일 검증은 `prototype/`에서 `npm run verify`, `npm run validate`로 실행한다. 이 명령들은 기존 컴파일 결과를 사용하므로 소스 수정 후 `npm run build`를 먼저 실행한다.
+현재 실행 근거·한계는 [Architecture Evaluation](../docs/06-architecture-evaluation.md)에 있다. `plan.md`, `report.md`, `defects.md`는 과거 TypeScript prototype 기록이며 현재 C# 결과로 사용하지 않는다.

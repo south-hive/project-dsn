@@ -25,8 +25,10 @@ public sealed class ViewService(IRecordQuery records)
 public sealed class ViewDefinitions
 {
     private readonly object gate = new();
-    private readonly string path;
+    private readonly string? path;
+    private readonly ISavedViewStore? store;
     private Dictionary<string, Dictionary<string, ViewDefinition>> data;
+    public ViewDefinitions(ISavedViewStore store) { this.store = store; data = []; }
     public ViewDefinitions(string path)
     {
         this.path = path;
@@ -34,7 +36,12 @@ public sealed class ViewDefinitions
     }
     public Dictionary<string, ViewDefinition> List(string user)
     {
-        lock (gate) return data.TryGetValue(user, out var views) ? views.ToDictionary(p => p.Key, p => Copy(p.Value)) : [];
+        lock (gate)
+        {
+            if (store is not null) return store.ListViews(user).ToDictionary(p => p.Key,
+                p => JsonSerializer.Deserialize<ViewDefinition>(p.Value, JsonFormat.Options) ?? throw new InvalidDataException("Invalid saved view"));
+            return data.TryGetValue(user, out var views) ? views.ToDictionary(p => p.Key, p => Copy(p.Value)) : [];
+        }
     }
     private static ViewDefinition Copy(ViewDefinition v) => new(v.Workspaces.ToArray(), v.Fields.ToArray());
     public void Put(string user, string name, ViewDefinition view)
@@ -42,16 +49,17 @@ public sealed class ViewDefinitions
         if (!ContractNames.Workspace(name)) throw new ArgumentException("Invalid View name");
         lock (gate)
         {
+            if (store is not null) { store.PutView(user, name, JsonSerializer.Serialize(Copy(view), JsonFormat.Options)); return; }
             var next = data.ToDictionary(p => p.Key, p => new Dictionary<string, ViewDefinition>(p.Value));
             if (!next.TryGetValue(user, out var views)) next[user] = views = [];
             if (!views.ContainsKey(name) && views.Count >= 128) throw new ArgumentException("View limit reached");
             views[name] = Copy(view);
             var bytes = JsonSerializer.SerializeToUtf8Bytes(next, JsonFormat.Options);
             if (bytes.Length > 4 * 1024 * 1024) throw new ArgumentException("View storage quota exceeded");
-            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path!))!);
             var temporary = path + ".tmp";
             using (var file = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None)) { file.Write(bytes); file.Flush(true); }
-            File.Move(temporary, path, true); data = next;
+            File.Move(temporary, path!, true); data = next;
         }
     }
 }

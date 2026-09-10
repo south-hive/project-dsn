@@ -15,7 +15,7 @@ internal sealed class Lifetime(int maxMessages = 4096, long maxBytes = 64 * 1024
         {
             if (created - reclaimed >= messageLimit || bytes + message.Payload.Length > byteLimit) return null;
             created++; bytes += message.Payload.Length;
-            return new(this, message.Envelope, message.Payload);
+            return new(this, message.Envelope, message.Payload, message.OriginalMessageId, message.ReplayId, message.ReceivedAt);
         }
     }
     internal void Acquired() { lock (gate) checkouts++; }
@@ -25,12 +25,15 @@ public sealed record LifetimeStats(long Created, long Reclaimed, long Checkouts,
 {
     public long References => Created + Checkouts - Checkins;
 }
-internal sealed class OwnedMessage(Lifetime owner, Envelope envelope, byte[] payload)
+internal sealed class OwnedMessage(Lifetime owner, Envelope envelope, byte[] payload, string? originalId = null, string? replayId = null, string? receivedAt = null)
 {
     private readonly object gate = new();
     private byte[]? bytes = payload;
     private int references = 1;
-    internal readonly string Id = Guid.NewGuid().ToString("N");
+    internal readonly string Id = originalId ?? Guid.NewGuid().ToString("N");
+    internal readonly string ProcessingId = Guid.NewGuid().ToString("N");
+    internal readonly string? ReplayId = replayId;
+    internal readonly string ReceivedAt = receivedAt ?? DateTimeOffset.UtcNow.ToString("O");
     internal readonly Envelope Envelope = envelope;
     internal Lease Checkout()
     {

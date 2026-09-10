@@ -1,9 +1,11 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+ARG TARGETARCH
 WORKDIR /source
 COPY Directory.Build.props Directory.Build.targets global.json ./
 COPY src/ src/
 COPY samples/ samples/
-RUN dotnet publish src/Dsn.Host/Dsn.Host.csproj -c Release -o /out/host --nologo \
+RUN case "$TARGETARCH" in amd64) DSN_RUNTIME=linux-x64 ;; arm64) DSN_RUNTIME=linux-arm64 ;; *) echo "Unsupported TARGETARCH" >&2; exit 1 ;; esac \
+ && dotnet publish src/Dsn.Host/Dsn.Host.csproj -c Release -o /out/host --nologo -r "$DSN_RUNTIME" --self-contained false \
     -p:DebugType=None -p:DebugSymbols=false \
  && mkdir /out/data
 

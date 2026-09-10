@@ -15,5 +15,10 @@
   "recordCapacity": 100000,
   "journalBytes": 268435456,
   "shutdownSeconds": 5,
-  "users": {}
+  "users": {},
+  "ingressBind": "127.0.0.1",
+  "retainRaw": true,
+  "rawBytes": 268435456,
+  "rawCapacity": 100000,
+  "pipelines": {}
 }

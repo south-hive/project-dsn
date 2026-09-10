@@ -1,0 +1,20 @@
+{
+  "bind": "127.0.0.1",
+  "ingressBind": "127.0.0.1",
+  "rpcPort": 7070,
+  "viewPort": 7071,
+  "dataDirectory": "data/pipeline",
+  "retainRaw": true,
+  "pipelines": {
+    "bench": {
+      "filters": [
+        { "type": "where", "options": { "field": "role", "op": "eq", "value": "telemetry-app" } },
+        { "type": "scale", "options": { "field": "value_latency_us", "output": "latency_ms", "factor": 0.001 } },
+        { "type": "where", "options": { "field": "latency_ms", "op": "gte", "value": 0.09 } },
+        { "type": "set", "options": { "field": "classification", "value": "latency-observation" } },
+        { "type": "select", "options": { "fields": ["pc_id", "dut_id", "run_id", "role", "sequence", "latency_ms", "classification"] } }
+      ],
+      "sinks": ["sqlite"]
+    }
+  }
+}

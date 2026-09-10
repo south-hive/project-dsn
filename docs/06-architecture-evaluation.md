@@ -1,47 +1,60 @@
 # 6. Architecture Evaluation
 
-## 평가 방법과 근거
+## 평가 근거
 
-[Architectural Drivers](03-architectural-drivers.md)의 시나리오와 구현 경계를 대조하고, 기존 기능 테스트·실제 프로세스 실행 결과로 확인 가능한 범위를 판단했다. 정식 ATAM 워크숍이나 운영 부하 평가는 수행하지 않았다.
+2026-09-09 Termux Android arm64, .NET SDK 10.0.111 / Mono 환경에서 검증했다. 로컬 기능과 실패·수명 계약의 평가이며 정식 ATAM이나 운영 규모 부하 인수는 아니다. 실제 드라이버 연동·테스트는 수행하지 않았다.
 
-이번 구조 변경의 실행 근거는 **2026-09-09** Termux Android arm64, .NET SDK 10.0.111, .NET/ASP.NET Core 10.0.11, `linux-bionic-arm64` Mono 환경이다. 12개 프로젝트를 Release로 다시 빌드하고, 기존 동작과 새 의존·호출 수명 경계를 검증했다.
+| 실행 | 확인 결과 |
+| --- | --- |
+| `DSN_BUILD_JOBS=1 bash scripts/check.sh` | Release 경고 0·오류 0, 단위 17 + 통합 10개 그룹 통과 |
+| `python tests/sdk/test_sources.py` | C++·Python 앱 SDK 6개 검사 통과; 외부 NuGet plugin 소비·실제 Host·재시작 |
+| `python tests/pipeline.py` | 앱 입력 3건 → 결과 2건·원본 3건, SQLite BLOB 확인; 재시작·조건 변경 후 제외 원본 replay → 새 결과·revision, 원본 수 불변 |
+| `dotnet publish … -r linux-arm64 --self-contained false` | Host·Workspace plugin·단일 native SQLite 포함, Mock/PDB 제외 확인; Linux 실행은 미검증 |
+| `python tests/bench.py --browser` | 세 Python 앱 프로세스의 6건 보존·재시작, Chromium 표·Source 필터·차트·다운로드·replay·393px 배치 확인 |
 
-- Release build: 경고 0, 오류 0. [단위 테스트](../tests/Dsn.UnitTests/Program.cs) 11개 + [통합 테스트](../tests/Dsn.IntegrationTests/Program.cs) 7개, 총 18개 그룹 통과.
-- publish 산출물 검사: 제거된 Core assembly 없음, 예제는 plugins 디렉터리로 배치, Mock은 Ingress/Contracts만 포함.
-- publish된 Host + 테스트 Source: notification 5개 → echo/hex record 10개, 실제 HTTP 값·journal 확인, SIGTERM exit 0.
-- publish된 독립 Mock + 테스트 Source: 정확한 payload hex, SIGTERM exit 0.
-- 배포 설정: Compose 공식 schema 검증, 임의 토큰 생성·기존 설정 보존, Make 명령 연결·CI 실패 시 빌드 중단 확인. Docker 입력 파일만 복사한 별도 경로에서 publish하여 Host/plugin 포함과 Mock·소스·PDB 제외 확인.
-- Docker 이미지 build/run과 Linux CoreCLR 실행은 미검증.
-
-재현 명령은 저장소 루트에서 `make check`, `make publish`다(기존 shell script도 사용 가능). `make ci`는 검증 후 Docker 이미지를 빌드한다. publish와 이미지 빌드는 프로세스 smoke test나 컨테이너 실행 인수를 자동 수행하지 않는다.
+브라우저 재처리 후 결과는 7건, 원본은 6건이다. 화면 산출물은 `artifacts/presenter-desktop.png`, `artifacts/presenter-mobile.png`이며 Git에서 제외한다. 재현 명령과 선택적 브라우저 준비는 [tests/README.md](../tests/README.md)를 따른다.
 
 ## Driver별 평가
 
-| 대상 | 근거·관찰 | 판정과 한계 |
+| 대상 | 근거 | 한계 |
 | --- | --- | --- |
-| UC1/4, C2/3 | decoder·실제 TCP split/coalesced·Mock/CLI | 기능 확인. production Source 비대기 성능·전송 전 손실은 검증 안 함 |
-| QA1 / 성능·자원 | queue/memory 포화 시 신규 거부, FIFO 기능 테스트 | 한도 동작만 확인. p99 지연·처리량·CPU·RSS·손실률 미평가 |
-| QA2 / 메모리 | 동시 중복 Checkin, 별도 context 동시 읽기, 지연/실패 호출 완료 후 정리, 저장 전 반납 | 시험 사례에서 단일 반환과 최종 참조 0. 장기 부하/GC·pool 동작 일반화 불가 |
-| QA3 / 격리 | Source별 연결 종료, 다른 Source 수신, 재접속 | TCP session 격리 확인. 공유 실행부의 plugin 지연 격리는 제공 안 함 |
-| QA4 / 복구 | flush/reopen·부분 tail 복구·id·값·export | 정상 재시작과 구성된 파일 사례 확인. 전원 손실·디스크 장애 주입 미평가 |
-| QA5 / 종료 | active 원본 유지, 대기분 회수, 늦은 완료, 포트 충돌 rollback | 자원 수명 기능 확인. 비협력 호출의 종료시간 상한 없음 |
-| QA6 / 접근 | HTTP 401/403/400, 사용자 정의 분리, 재시작 복구 | 기능 확인. 침투 시험·TLS 배치·RPC 신원 검증은 범위 밖 |
-| QA7 / 변경 | 기능 assembly의 Contracts 단독 의존, Runtime 내부 원본 비공개, 금지된 프로젝트 참조 빌드 거부, 예제 DLL 로딩 | 프로젝트 경계와 예제 plugin 경로 확인. 부적합 API 버전/복잡한 의존 DLL 조합은 검증 확대 필요 |
-| QA8 / 관측 | 본문 동일성·count·한도·snapshot 투영 | 기본 집계 확인. 주기 전송의 동시성/부분 실패·장기간 quota 영향 미평가 |
-| C1 / 배포 | Termux build/publish/별도 프로세스 실행 | C# 실행 확인. Docker 구성의 실행 인수는 남음 |
+| UC1 / C2·C3 | opaque TCP framing·Source SDK·독립 업무 Workspace | true는 큐 접수, 내구 저장 ACK나 exactly-once 아님 |
+| UC2 / QA6 | 인증·Workspace scope·사용자 View·원본 전체 대상 ACL·replay 권한 | TLS 배치·입력 인증·침투 시험 미포함 |
+| UC3 / QA7 | 제외 원본을 새 Filter 조건으로 replay, ID 유지·revision 변경 | 재처리는 append, 반복 요청은 별도 실행; 분석 규칙의 정확성 미평가 |
+| UC4 / QA3 | Filter 순서·drop·scope/provenance 보호·설정 오류·Sink 실패 검사 | 임의 graph·window 집계·시간 격리·다중 Sink 원자성 없음 |
+| UC5 / QA4 | SQLite BLOB·ID·View 재시작, 소유 lock, quota, legacy 이전 전체 rollback·반복 방지 | 전원 차단·파일시스템/디스크 장애 주입 미평가 |
+| QA1·QA2 | 큐/메모리 포화·중복 Checkin·예외·종료 후 최종 참조 회수 | 장기 GC·운영 처리량/p99·손실률 미측정 |
+| QA5 | Workspace 실패 격리·원본 quota 실패·Filter/Sink 실패 보고 | 느린 plugin/저장소는 공유 FIFO 지연, 비협력 작업 종료시간 상한 없음 |
+| C6 | Contracts 단독 기능 의존·금지 참조 빌드 거부·DLL 로딩 | plugin은 신뢰 코드이며 프로세스 격리 없음 |
 
-## 민감 지점과 Trade-off
+## Trade-off와 후속 평가
 
-| 지점 | 설계상의 이득 | 민감도·잔여 위험 | 다음 평가 |
-| --- | --- | --- | --- |
-| 순차 executor + 동기 flush | FIFO와 실패·수명 추적 단순 | plugin/저장 지연이 전체 backlog와 root 보유 시간을 늘림 | 입력률·payload·flush 지연을 바꿔 queue/지연/손실 측정 |
-| journal + 메모리 index | 추가 DB 없이 단순 복구 | quota 이후 쓰기 거부, 재시작 비용·RSS 증가 | 데이터 크기별 복구 시간/RSS, 저장 장애 주입 |
-| 협력 종료 | active 메모리 조기 회수 방지 | 비협력 plugin은 종료 지연, 강제 프로세스 종료 시 미저장 손실 | 비협력 작업 시 운영 종료 절차 결정 |
-| 오류 snapshot append | 접수와 저장 분리, 누적 이력 | snapshot 중간 실패 시 재시도로 일부 중복 가능; revision과 snapshot의 동시성, dropped 가시성 제한 | 부분 저장 실패/동시 Report 주입 후 count·revision 비교 |
-| 신뢰 경계와 Host 집중 | 단순 plugin/HTTP 조립 | 신뢰하지 않는 plugin 실행 위험, 인증 정책과 배포 신뢰 경계는 Host에 집중 | 격리 수준과 외부 인증 요구를 별도 검토 |
+| 선택 | 이득 | 남은 과제 |
+| --- | --- | --- |
+| 로컬 SQLite | 외부 DB 없이 트랜잭션·BLOB·SQL 페이지 조회 | record별 트랜잭션 비용 측정 후 배치 writer 검토 |
+| Filter 전에 원본 보존 | 실패·제외 후에도 재해석 | 큐 접수→원본 저장 사이 손실; ACK/outbox는 별도 설계 |
+| 논리 quota | 보존 한도에서 명시적으로 거부 | 물리 DB/WAL 감시·기간별 보존·자동 회전 필요 |
+| 동일 저장 식별자·View | 단일 PC 운영 유지, 이후 통합 기반 | 중앙 업로드·중복 제거·checkpoint·통합 cursor 미구현 |
+| 순차 처리·같은 replay 큐 | 완료·소유권 추적 단순 | 실시간/replay 간 공정성·처리량 측정 필요 |
 
-## 결론
+현재 범위는 독립 PC에서 Source → Workspace/Filter → Sink → Presenter를 실제 실행할 수 있는 단계다. 수천 PC·PC별 2~8 DUT의 운영 인수, 중앙 동기화, Docker 이미지 build/run·Linux CoreCLR 실행은 아직 완료한 것으로 보지 않는다. 다음 평가는 실제 앱 입력률·payload 크기·보존 기간을 정한 뒤 처리량/지연·디스크/RSS를 측정하고, 저장 장애와 재시작 복구를 주입하는 순서다.
 
-프로젝트 분리는 수명·순서 계약의 범용 병렬화를 의미하지 않는다. 순차 실행만 지원하며, 공유 원본을 서로 다른 context로 동시에 읽는 테스트는 병렬 Runtime의 인수가 아니다.
+## 단일 PC 우선 과제 (2026-09-10, 미구현 backlog)
 
-현재 구조는 수신 → 해석 → 영속 저장 → 사용자별 조회의 기본 기능과 주요 수명·실패 계약을 시험 환경에서 충족한다. 성능·장기 운영 안정성·Linux 배포까지 검증된 상태는 아니다. 다음 평가는 Docker 실행/volume 복구, 저장 장애·snapshot 부분 실패, 부하 시 순차 처리 비용 순으로 수행하며 측정 전에 목표 workload와 허용 기준을 정한다.
+| 순서 / ID | 항목 | 완료 기준 |
+| --- | --- | --- |
+| 1 / L1 | 물리 디스크·WAL·quota·큐 적체·거부/저장 실패 가시화와 보존 정책 | 상한 전 경고, 기간/용량별 명시적 회전·삭제 정책, 디스크 부족 시 앱 수집 상태 확인 |
+| 2 / L2 | PC별 2~8 DUT 앱 부하·저장 장애 검증 | 실제 입력률/크기로 처리량·p99·RSS·손실 측정, 강제 종료/디스크 부족 후 복구; 필요 시 배치 writer |
+| 3 / L3 | 전체 저장 이력 조회 | PC/DUT/Source/시험/기간 조건의 서버 측 검색·집계·다운샘플 차트, 현재 페이지 필터 한계 해소 |
+| 4 / L4 | 로컬 운영 수명 | 자동 시작·실패 재시작·정상 종료 절차, 필요 데이터에 대한 SDK spool/ACK·재전송/중복 정책 결정 |
+| 5 / O1 | 독립 snapshot DB 내보내기 | 수집 중 일관된 파일, BLOB/ID/View 보존, 무결성·실패/미완료 출력 처리, schema/원본 PC/생성 시점 식별 |
+| 6 / O2 | 사무 PC 읽기 전용 Viewer | 기존 웹 재사용, 원본 DB 변경 없음, Ingress/plugin/Admin/replay 없음, 인터넷·시험 PC 연결 없이 동작 |
+| 7 / O3 | 파일 선택·호환성·배포 | 새 snapshot 선택, 미지원 schema/손상 파일 안내, 대상 OS용 오프라인 실행 묶음; 여러 PC 통합은 후속 |
+
+기본 원본 quota는 100,000건이라 지속 10건/초만 들어와도 약 2.8시간에 count 상한에 도달한다(byte 상한은 더 먼저 닿을 수 있음). 따라서 현재 기본 설정을 장기 무인 수집의 보존 정책으로 간주하지 않는다. 자동 삭제는 사용자 보존 요구를 정한 뒤 적용한다.
+
+O1~O3는 네트워크 차단 환경에서 DB만 옮겨 같은 웹으로 보는 후속 옵션으로 등록했다. 설계는 [Top Level Design의 후속 배포 옵션](04-top-level-design.md#후속-배포-옵션-망-분리-환경의-사무-pc-열람-미구현)을 따른다. 이 항목들은 구현/검증 완료 내역과 구분한다.
+
+## v0.1.0 미리보기 릴리즈 검증 (2026-09-10)
+
+Release 빌드 경고/오류 0, C# 단위 17 + 통합 10개 그룹, SDK 6개, 파이프라인 조건 변경·재처리·재시작 검사를 다시 통과했다. Portable ZIP을 임시 디렉터리에 풀고 포함된 Python wheel을 오프라인 설치하여 세 앱 입력 30건 → 원본 30건/결과 8건, SQLite·처리 경로·웹 UI·정상 종료를 확인했다. 약 17MB ZIP은 .NET 런타임을 포함하지 않으며 ASP.NET Core Runtime 10 또는 SDK 10을 별도 설치해야 한다. Termux 외 실행과 조회 전용 Viewer는 이번 릴리즈의 검증/구현 범위 밖이다.

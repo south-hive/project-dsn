@@ -6,7 +6,13 @@ public sealed record Envelope(int Version, string SourceId, JsonElement? SourceD
     string Time, string EventType, IReadOnlyList<string> Workspace);
 
 /// <summary>Payload ownership transfers to the sink for this call; the producer must not mutate or reuse it afterwards.</summary>
-public sealed record InboundMessage(Envelope Envelope, byte[] Payload);
+public sealed record InboundMessage(Envelope Envelope, byte[] Payload)
+{
+    // Set by trusted replay callers only; the wire protocol never accepts these.
+    public string ReceivedAt { get; init; } = DateTimeOffset.UtcNow.ToString("O");
+    public string? OriginalMessageId { get; init; }
+    public string? ReplayId { get; init; }
+}
 
 public interface IMessageSink
 {

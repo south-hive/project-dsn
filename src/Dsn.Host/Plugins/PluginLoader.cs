@@ -7,7 +7,7 @@ namespace Dsn.Host;
 public sealed class PluginLoader
 {
     private readonly List<AssemblyLoadContext> contexts = [];
-    public void Load(string path, IWorkspaceRegistration registry, WorkspaceServices services, bool required = true)
+    public void Load(string path, IWorkspaceRegistration registry, WorkspaceServices services, bool required = true, IFilterRegistration? filters = null)
     {
         try
         {
@@ -15,7 +15,14 @@ public sealed class PluginLoader
             var context = new PluginContext(Path.GetFullPath(path)); contexts.Add(context);
             var assembly = context.LoadFromAssemblyPath(Path.GetFullPath(path));
             var types = assembly.GetTypes().Where(t => !t.IsAbstract && typeof(IWorkspacePlugin).IsAssignableFrom(t)).ToArray();
-            if (types.Length == 0) throw new InvalidOperationException("No plugin factories found");
+            var filterTypes = assembly.GetTypes().Where(t => !t.IsAbstract && typeof(IFilterPlugin).IsAssignableFrom(t)).ToArray();
+            if (types.Length == 0 && filterTypes.Length == 0) throw new InvalidOperationException("No plugin factories found");
+            foreach (var type in filterTypes)
+            {
+                var plugin = (IFilterPlugin)Activator.CreateInstance(type)!;
+                if (plugin.ApiVersion != 1 || filters is null || !filters.RegisterFilter(plugin.Type, plugin.Create))
+                    throw new InvalidOperationException("Unsupported or duplicate filter plugin");
+            }
             foreach (var type in types)
             {
                 var plugin = (IWorkspacePlugin)Activator.CreateInstance(type)!;

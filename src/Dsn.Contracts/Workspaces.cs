@@ -21,6 +21,9 @@ public interface IMessageContext
 {
     IPayloadLease Checkout();
     bool Checkin(IPayloadLease lease);
+    /// <summary>Emit independent result fields. Runtime adds provenance and owns persistence.</summary>
+    ValueTask EmitAsync(IReadOnlyDictionary<string, JsonElement> fields, CancellationToken token = default) =>
+        throw new NotSupportedException("This context does not support result emission");
 }
 public interface IWorkspace
 {

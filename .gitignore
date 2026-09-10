@@ -10,3 +10,6 @@
 /artifacts/
 /settings.docker.json
 /settings.local.json
+**/__pycache__/
+**/*.egg-info/
+/sdk/source/python/build/

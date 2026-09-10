@@ -187,4 +187,142 @@ await suite.Test("separate contexts may read concurrently without sharing cleanu
     first.Dispose(); Suite.Equal("bytes", right.Payload.ToUtf8());
     second.Dispose(); root.Release(); Suite.Equal(0L, lifetime.Stats.References);
 });
+await suite.Test("temperature schema validation, independent records and lease return on failure", async () =>
+{
+    var lifetime = new Lifetime(); var records = new MemoryRecordStore();
+    var workspace = new Dsn.Workspaces.Temperature.TemperatureWorkspace(records);
+    var valid = """{"schema":"temperature.v1","sensor":"실험실","celsius":23.5,"sequence":1}""";
+    var owned = lifetime.Create(Suite.Message("sensor", ["temperature"], Encoding.UTF8.GetBytes(valid)))!;
+    using (var context = new MessageContext(owned)) await workspace.ProcessAsync(context, default);
+    Suite.Equal(1L, lifetime.Stats.References); owned.Release();
+    var record = records.Query(new()).Single();
+    Suite.Equal("실험실", record.Fields["sensor"].GetString()); Suite.Equal(23.5, record.Fields["celsius"].GetDouble());
+    foreach (var invalid in new[] { "[]", "{}", valid.Replace("temperature.v1", "temperature.v2"),
+        valid.Replace("23.5", "-274"), valid.Replace("23.5", "1e400"), valid.Replace("\"sequence\":1", "\"sequence\":-1"),
+        valid.Replace("\"sequence\":1", "\"sequence\":1.5"), valid.Replace("23.5", "\"23.5\"") })
+    {
+        var root = lifetime.Create(Suite.Message("sensor", ["temperature"], Encoding.UTF8.GetBytes(invalid)))!;
+        using var context = new MessageContext(root);
+        await Suite.ThrowsAsync<FormatException>(() => workspace.ProcessAsync(context, default).AsTask());
+        Suite.Equal(1L, lifetime.Stats.References); root.Release();
+    }
+    Suite.Equal(0L, lifetime.Stats.References); Suite.Equal(1, records.Query(new()).Count);
+});
+
+await suite.Test("ordered filters transform/drop records and preserve provenance", async () =>
+{
+    var store = new MemoryRecordStore(); var errors = new ErrorSink(); var pipeline = new PipelineRouter(store, errors);
+    pipeline.Configure(new Dictionary<string, PipelineDefinition> { ["bench"] = new([
+        Filter("scale", new { field = "latency_us", output = "latency_ms", factor = 0.001 }),
+        Filter("where", new { field = "latency_ms", op = "gte", value = 0.09 }),
+        Filter("set", new { field = "label", value = "observe" }),
+        Filter("select", new { fields = new[] { "latency_ms", "label" } })], ["sqlite"]) }, ["bench"]);
+    var fields = Fields.From(("latency_us", 100), ("message_id", "original"), ("source_id", "app"), ("unneeded", 1));
+    await pipeline.AppendAsync(new("bench", fields));
+    await pipeline.AppendAsync(new("bench", Fields.From(("latency_us", 80))));
+    await pipeline.AppendAsync(new("bench", Fields.From(("other", 1))));
+    var result = store.Query(new()).Single();
+    Suite.Equal(.1, result.Fields["latency_ms"].GetDouble()); Suite.Equal("observe", result.Fields["label"].GetString());
+    Suite.Equal("original", result.Fields["message_id"].GetString()); Suite.Equal("app", result.Fields["source_id"].GetString());
+    Suite.Check(!result.Fields.ContainsKey("unneeded")); Suite.Check(!fields.ContainsKey("latency_ms"));
+    Suite.Equal(pipeline.Revisions["bench"], result.Fields["pipeline_revision"].GetString());
+    var statistics = JsonSerializer.SerializeToElement(pipeline.Statistics);
+    Suite.Equal(2L, statistics.GetProperty("dropped").GetInt64()); Suite.Equal(1L, statistics.GetProperty("completed").GetInt64());
+});
+await suite.Test("pipeline rejects invalid configuration before accepting work", async () =>
+{
+    foreach (var spec in new[] {
+        new PipelineDefinition([Filter("unknown", new { })], ["sqlite"]),
+        new PipelineDefinition([Filter("scale", new { field="x", output="source_id", factor=1 })], ["sqlite"]),
+        new PipelineDefinition([Filter("where", new { field="x", op="gte", value="bad" })], ["sqlite"]),
+        new PipelineDefinition([Filter("set", new { field="x", value=1, typo=true })], ["sqlite"]),
+        new PipelineDefinition([], ["absent"]), new PipelineDefinition([], ["sqlite","sqlite"]) })
+    {
+        var router = new PipelineRouter(new MemoryRecordStore(), new ErrorSink());
+        Suite.Throws<ArgumentException>(() => router.Configure(new Dictionary<string, PipelineDefinition> { ["echo"] = spec }, ["echo"]));
+    }
+    var pipeline = new PipelineRouter(new MemoryRecordStore(), new ErrorSink());
+    Suite.Throws<ArgumentException>(() => pipeline.Configure(new Dictionary<string, PipelineDefinition> { ["absent"] = new([], ["sqlite"]) }, ["echo"]));
+    pipeline.Configure(new Dictionary<string, PipelineDefinition>(), ["echo"]);
+    Suite.Throws<InvalidOperationException>(() => pipeline.RegisterFilter("later", _ => new DelegateFilter(r => r)));
+    await Task.CompletedTask;
+});
+await suite.Test("custom filter chaining protects scope and provenance; sink failure is visible", async () =>
+{
+    var store = new MemoryRecordStore(); var errors = new ErrorSink(); var pipeline = new PipelineRouter(store, errors);
+    pipeline.RegisterFilter("custom", _ => new DelegateFilter(r => new(r.Workspace, Fields.From(("source_id", "forged"), ("answer", 42)))));
+    pipeline.Configure(new Dictionary<string, PipelineDefinition> { ["echo"] = new([
+        Filter("custom", new {}), Filter("where", new { field="source_id", op="eq", value="real" })], ["sqlite"]) }, ["echo"]);
+    await pipeline.AppendAsync(new("echo", Fields.From(("source_id", "real"), ("message_id", "m"))));
+    Suite.Equal("real", store.Query(new()).Single().Fields["source_id"].GetString());
+    var broken = new PipelineRouter(new FailingRecordStore(), errors);
+    broken.Configure(new Dictionary<string, PipelineDefinition>(), ["echo"]);
+    await Suite.ThrowsAsync<IOException>(() => broken.AppendAsync(new("echo", Fields.From(("x", 1)))).AsTask());
+    Suite.Check(errors.Snapshot().Any(e => e.Body.Code == "PIPELINE_FAILED"));
+    var scoped = new PipelineRouter(store, errors);
+    scoped.RegisterFilter("redirect", _ => new DelegateFilter(r => r with { Workspace = "private" }));
+    scoped.Configure(new Dictionary<string, PipelineDefinition> { ["echo"] = new([Filter("redirect", new {})], ["sqlite"]) }, ["echo"]);
+    await Suite.ThrowsAsync<InvalidOperationException>(() => scoped.AppendAsync(new("echo", Fields.From(("x", 1)))).AsTask());
+});
+await suite.Test("SQLite raw blobs, stable node/record identity, quotas and saved views survive restart", async () =>
+{
+    var path = suite.Path("sqlite/state.db"); string node, recordId;
+    using (var store = new SqliteStore(path, recordCapacity: 1, rawCapacity: 1))
+    {
+        node = store.NodeId;
+        Suite.Throws<IOException>(() => new SqliteStore(path));
+        await store.AppendAsync("message-1", Suite.Message("app", ["echo"], [0,255,10]));
+        await store.AppendAsync(new("echo", Fields.From(("text", "hello ' SQL"), ("message_id", "message-1"))));
+        recordId = store.Query(new()).Single().Fields["record_id"].GetString()!;
+        await Suite.ThrowsAsync<IOException>(() => store.AppendAsync(new("echo", Fields.From(("text", "overflow")))).AsTask());
+        await Suite.ThrowsAsync<IOException>(() => store.AppendAsync("message-2", Suite.Message("app", ["echo"], [])).AsTask());
+        Suite.Equal(1, store.Query(new()).Count); Suite.Equal(1, store.Read().Count);
+        Suite.Check(store.Fields()["echo"].Contains("text"));
+        var definitions = new ViewDefinitions(store); definitions.Put("local", "my-view", new(["echo"], ["id","text"]));
+    }
+    using (var store = new SqliteStore(path, recordCapacity: 1, rawCapacity: 1))
+    {
+        Suite.Equal(node, store.NodeId); Suite.Equal(recordId, store.Query(new()).Single().Fields["record_id"].GetString());
+        Suite.Equal("hello ' SQL", store.Query(new()).Single().Fields["text"].GetString());
+        Suite.Equal("00ff0a", Convert.ToHexString(store.Read().Single().Payload).ToLowerInvariant());
+        Suite.Equal("message-1", store.Read().Single().MessageId);
+        Suite.Check(new ViewDefinitions(store).List("local").ContainsKey("my-view"));
+    }
+});
+await suite.Test("SQLite legacy import is atomic, repeat-safe and leaves input files untouched", async () =>
+{
+    var directory = suite.Path("migration"); Directory.CreateDirectory(directory);
+    var journal = Path.Combine(directory,"records.ndjson"); var raw = Path.Combine(directory,"raw.ndjson");
+    using (var store = new JournalStore(journal)) await store.AppendAsync(new("echo", Fields.From(("message_id","legacy"),("x",1))));
+    using (var archive = new RawArchive(raw, 1024*1024,100)) await archive.AppendAsync("legacy", Suite.Message("app",["echo"],[0,255]));
+    new ViewDefinitions(Path.Combine(directory,"views.json")).Put("local","view",new(["echo"],["x"]));
+    File.AppendAllText(journal,"incomplete"); var before = File.ReadAllBytes(journal);
+    using (var store = new SqliteStore(Path.Combine(directory,"dsn.db")))
+    {
+        store.ImportLegacy(directory); store.ImportLegacy(directory);
+        Suite.Equal(1,store.Query(new()).Count); Suite.Equal(1L,store.Query(new()).Single().Id);
+        Suite.Equal("legacy",store.Read().Single().MessageId);
+        Suite.Check(new ViewDefinitions(store).List("local").ContainsKey("view"));
+        Suite.Check(before.SequenceEqual(File.ReadAllBytes(journal)));
+    }
+    var bad = suite.Path("bad-migration"); Directory.CreateDirectory(bad);
+    File.WriteAllBytes(Path.Combine(bad,"records.ndjson"),before);
+    File.WriteAllText(Path.Combine(bad,"raw.ndjson"),"not-json\n");
+    using (var store = new SqliteStore(Path.Combine(bad,"dsn.db")))
+    {
+        Suite.Throws<JsonException>(()=>store.ImportLegacy(bad)); Suite.Equal(0,store.Query(new()).Count);
+        File.WriteAllText(Path.Combine(bad,"raw.ndjson"),""); store.ImportLegacy(bad); Suite.Equal(1,store.Query(new()).Count);
+    }
+});
+static FilterDefinition Filter(string type, object options) => new(type, JsonSerializer.SerializeToElement(options));
+
 suite.Finish();
+
+sealed class DelegateFilter(Func<RecordInput, RecordInput?> transform) : IRecordFilter
+{
+    public ValueTask<RecordInput?> ProcessAsync(RecordInput record, CancellationToken token) => ValueTask.FromResult(transform(record));
+}
+sealed class FailingRecordStore : IRecordStore
+{
+    public ValueTask AppendAsync(RecordInput record, CancellationToken cancellationToken = default) => throw new IOException("Simulated sink failure");
+}

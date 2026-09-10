@@ -1,0 +1,6 @@
+{
+  "dataDirectory": "data/temperature",
+  "plugins": [
+    "samples/temperature/Dsn.Workspaces.Temperature/bin/Release/net10.0/Dsn.Workspaces.Temperature.dll"
+  ]
+}

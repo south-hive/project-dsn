@@ -5,13 +5,18 @@ using Dsn.Contracts;
 
 namespace Dsn.Host;
 
-public sealed record UserAccess(string Token, string[] Workspaces);
+public sealed record UserAccess(string Token, string[] Workspaces, bool CanReplay = false);
 public sealed class Settings
 {
     public string Bind { get; init; } = "127.0.0.1";
+    public string IngressBind { get; init; } = "127.0.0.1";
+    public bool RetainRaw { get; init; } = true;
+    public long RawBytes { get; init; } = 256 * 1024 * 1024;
+    public int RawCapacity { get; init; } = 100000;
     public int RpcPort { get; init; } = 7070;
     public int ViewPort { get; init; } = 7071;
     public string DataDirectory { get; init; } = "data";
+    public Dictionary<string, PipelineDefinition> Pipelines { get; init; } = [];
     public string[] Plugins { get; init; } = [];
     public int QueueCapacity { get; init; } = 1024;
     public long QueueBytes { get; init; } = 16 * 1024 * 1024;
@@ -27,10 +32,10 @@ public sealed class Settings
     public Dictionary<string, UserAccess> Users { get; init; } = [];
     public void Validate()
     {
-        if (!IPAddress.TryParse(Bind, out var address) || RpcPort is < 0 or > 65535 || ViewPort is < 0 or > 65535 ||
+        if (!IPAddress.TryParse(IngressBind, out _) || RawBytes < 1 || RawCapacity < 1 || !IPAddress.TryParse(Bind, out var address) || RpcPort is < 0 or > 65535 || ViewPort is < 0 or > 65535 ||
             QueueCapacity < 1 || QueueBytes < 1 || MaxMessages < 1 || LiveBytes < 1 || MaxSessions < 1 || FrameBytes is < 1 or > 4 * 1024 * 1024 ||
             PayloadBytes < 0 || PayloadBytes > FrameBytes || ErrorCapacity < 1 || RecordCapacity < 1 || JournalBytes < 1 || ShutdownSeconds is < 1 or > 300 ||
-            string.IsNullOrWhiteSpace(DataDirectory) || Plugins is null || Users is null) throw new ArgumentException("Invalid DSN settings");
+            string.IsNullOrWhiteSpace(DataDirectory) || Pipelines is null || Pipelines.Count > 128 || Pipelines.Keys.Any(w => !ContractNames.Workspace(w)) || Plugins is null || Users is null) throw new ArgumentException("Invalid DSN settings");
         if (!IPAddress.IsLoopback(address) && Users.Count == 0) throw new ArgumentException("Remote View requires configured users/tokens");
         if (Users.Count > 128 || Users.Any(p => !ContractNames.Workspace(p.Key) || p.Value is null || string.IsNullOrWhiteSpace(p.Value.Token) || p.Value.Token.Length < 16 ||
             p.Value.Workspaces is null || p.Value.Workspaces.Length is < 1 or > 32 || p.Value.Workspaces.Any(w => !ContractNames.Workspace(w))) || Users.Values.Select(u => u.Token).Distinct().Count() != Users.Count)

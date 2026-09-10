@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <ItemGroup>
+    <EmbeddedResource Include="Http/Presenter.html" LogicalName="Dsn.Host.Presenter.html" />
     <ProjectReference Include="../Dsn.Contracts/Dsn.Contracts.csproj" />
     <ProjectReference Include="../Dsn.Runtime/Dsn.Runtime.csproj" />
     <ProjectReference Include="../Dsn.Ingress/Dsn.Ingress.csproj" />

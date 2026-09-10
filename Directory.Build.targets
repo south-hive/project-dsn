@@ -1,6 +1,6 @@
 <Project>
   <PropertyGroup>
-    <DsnContractOnly Condition="'$(MSBuildProjectName)' == 'Dsn.Runtime' or '$(MSBuildProjectName)' == 'Dsn.Ingress' or '$(MSBuildProjectName)' == 'Dsn.Persistence' or '$(MSBuildProjectName)' == 'Dsn.Diagnostics' or '$(MSBuildProjectName)' == 'Dsn.View' or '$(MSBuildProjectName)' == 'Dsn.Workspaces.Examples'">true</DsnContractOnly>
+    <DsnContractOnly Condition="'$(MSBuildProjectName)' == 'Dsn.Runtime' or '$(MSBuildProjectName)' == 'Dsn.Ingress' or '$(MSBuildProjectName)' == 'Dsn.Persistence' or '$(MSBuildProjectName)' == 'Dsn.Diagnostics' or '$(MSBuildProjectName)' == 'Dsn.View' or $([System.String]::Copy('$(MSBuildProjectName)').StartsWith('Dsn.Workspaces.'))">true</DsnContractOnly>
   </PropertyGroup>
   <Target Name="ValidateArchitecture" BeforeTargets="ResolveProjectReferences">
     <ItemGroup>
