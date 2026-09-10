@@ -84,7 +84,7 @@ def pack():
 
 def check():
     verify()
-    # Deliberately start with no DSN packages, pip cache, or venv. Keep the environment for inspection.
+    # Deliberately start with no DSN packages or Python SDK build tools. Keep the environment for inspection.
     (ROOT/'.dev').mkdir(exist_ok=True)
     directory=Path(tempfile.mkdtemp(prefix='offline-check-',dir=ROOT/'.dev'))
     env={**os.environ,'OFFLINE':'1','DSN_DEV_DIR':str(directory),'PIP_NO_INDEX':'1'}

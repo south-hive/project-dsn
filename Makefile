@@ -7,10 +7,10 @@ export OFFLINE ?= 0
 RUN := bash scripts/dev.sh
 DEMO_ARGS ?=
 
-.PHONY: help env doctor restore deps-update python-tools build clean check test publish demo demo-check pipeline-host pipeline-check bench-host bench-sources bench-check offline-pack offline-check
+.PHONY: help env doctor restore deps-update build clean check test publish demo demo-check pipeline-host pipeline-check bench-host bench-sources bench-check offline-pack offline-check
 help:
 	@printf '%s\n' \
-	  'env / doctor    Create/check project venv and SDK selection' \
+	  'env / doctor    Prepare/check .NET SDK selection and project caches' \
 	  'restore         Restore locked packages (OFFLINE=1 for local feed)' \
 	  'build           Build solution with isolated caches' \
 	  'clean           Clean C# build outputs; retain collected data' \
@@ -37,9 +37,6 @@ restore: env
 
 deps-update: env
 	$(RUN) locks DSN.sln
-
-python-tools: env
-	$(RUN) python-tools
 
 build: restore
 	$(RUN) dotnet build DSN.sln -c Release --no-restore --nologo -m:"$(DSN_BUILD_JOBS)" -nr:false

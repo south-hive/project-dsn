@@ -67,6 +67,12 @@ Release 빌드 경고/오류 0, C# 단위 17 + 통합 10개 그룹, SDK 6개, �
 
 ## 격리 환경·오프라인 의존 검증 (2026-09-10)
 
-`make offline-check DSN_BUILD_JOBS=1`은 새 venv와 빈 NuGet/pip cache에서 로컬 feed만 사용하여 Release build(경고/오류 0), C# 18+10개 그룹, SDK 6개, 4 DUT 192건 E2E 및 재시작 검증을 통과했다. 일반 외부 HTTP proxy는 연결 불가 주소로 지정했고 loopback 테스트만 우회했다. NuGet 5개와 Python 빌드 도구 3개의 원본 package·manifest·SHA-256을 약 20MB 반입 ZIP으로 만들었다. OS 수준 네트워크 격리 시험이나 SDK/OS 도구 자체의 오프라인 설치 검증은 아니다.
+초기 격리 구성(커밋 `4640ae1`)의 `make offline-check DSN_BUILD_JOBS=1`은 새 venv와 빈 NuGet/pip cache에서 로컬 feed만 사용하여 Release build(경고/오류 0), C# 18+10개 그룹, SDK 6개, 4 DUT 192건 E2E 및 재시작 검증을 통과했다. 일반 외부 HTTP proxy는 연결 불가 주소로 지정했고 loopback 테스트만 우회했다. NuGet 5개와 Python 빌드 도구 3개의 원본 package·manifest·SHA-256을 약 20MB 반입 ZIP으로 만들었다. OS 수준 네트워크 격리 시험이나 SDK/OS 도구 자체의 오프라인 설치 검증은 아니다.
 
 SDK는 10.0.1xx 계열 안에서 patch를 허용하며 이번 실행은 Termux 10.0.111이다. linux-arm64 framework-dependent publish와 해당 RID의 plugin·SQLite native 파일 포함을 확인했다. Docker 빌드는 온라인을 전제로 한다. Docker SDK 10.0.103 태그의 존재를 확인했지만 Docker 실행은 미검증이다. [환경 구성과 명령](development-environment.md).
+
+## .NET 기본 개발 환경으로 정리 (2026-09-10)
+
+기본 env/build/check/publish에서 Python venv 생성·활성화와 pip 설정을 제거했다. SDK 선택(global.json), NuGet lock, 프로젝트별 NuGet cache와 CLI 상태를 사용한다. Python SDK 패키징 도구는 선택 명령에서만 별도 디렉터리에 설치한다.
+
+Python/pip 명령을 실패하도록 차단한 PATH로 `make doctor`와 `OFFLINE=1 make check DSN_BUILD_JOBS=1`을 실행하여 Release build(경고/오류 0), 단위 18 + 통합 10개 그룹을 통과했다. venv 없이 로컬 wheel 공급처에서 Python SDK 패키징도 통과했다. 시스템 Python으로 자동 데모 4 DUT 192건의 원본·결과·HTTP 조회 및 재시작 보존을 다시 확인했다.

@@ -2,7 +2,7 @@ ifndef DSN_MAKE_ROOT
 include Makefile
 .DEFAULT_GOAL := sdk-help
 else
-.PHONY: sdk-help sdk-build sdk-pack sdk-check workspace-sdk sample-host sample-python sample-cpp release-pack
+.PHONY: python-tools sdk-help sdk-build sdk-pack sdk-check workspace-sdk sample-host sample-python sample-cpp release-pack
 sdk-help:
 	@printf '%s\n' 'sdk-build      C++ SDK, tests and temperature example' \
 	  'workspace-sdk  Pack Dsn.Contracts NuGet' 'sdk-pack       Pack Python/C++/C# SDKs' \
@@ -17,8 +17,11 @@ sdk-build: env
 workspace-sdk: restore
 	$(RUN) dotnet pack src/Dsn.Contracts -c Release -o artifacts/sdk --no-restore --nologo -m:"$(DSN_BUILD_JOBS)" -nr:false
 
+python-tools: env
+	bash scripts/python-sdk.sh setup
+
 sdk-pack: sdk-build workspace-sdk python-tools
-	$(RUN) python -m pip wheel --no-index --no-deps --no-build-isolation --wheel-dir artifacts/sdk sdk/source/python
+	bash scripts/python-sdk.sh wheel
 	$(RUN) cmake --install artifacts/source-cpp --prefix "$(CURDIR)/artifacts/sdk/cpp"
 
 sdk-check: check
