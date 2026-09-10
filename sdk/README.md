@@ -19,7 +19,7 @@ make sdk-check     # 서버 테스트, 패키징, 언어별 SDK 시험, 실제 H
 make sdk-pack      # 패키징만: artifacts/sdk/
 ```
 
-필요 도구는 .NET 10 SDK, Make/Bash, CMake 3.16+, C++17 compiler, Python 3.10+와 pip다. Python wheel 빌드에는 setuptools가 필요하며 pip가 build 환경에 설치한다. 외부 registry에 자동 게시하지 않는다.
+필요 도구는 .NET 10 SDK, Make/Bash, CMake 3.16+, C++17 compiler, Python 3.10+와 pip다. Python wheel 빌드 도구는 requirements-dev.lock의 버전/hash로 프로젝트 venv에 설치한다. `OFFLINE=1`은 반입한 wheel만 사용한다. [격리 환경·반입 절차](../docs/development-environment.md). 외부 registry에 자동 게시하지 않는다.
 
 | 산출물 | 다른 프로젝트에서 사용 |
 | --- | --- |

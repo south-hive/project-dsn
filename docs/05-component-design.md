@@ -19,6 +19,7 @@ flowchart LR
 | Python/C++ Source SDK | 제한된 송신 큐, 복사, 연결·로컬 통계 |
 | IWorkspacePlugin / IWorkspace | 시작 시 factory, 이름·비동기 처리 계약 |
 | IMessageContext / IPayloadLease | 호출별 원본 접근과 완료 수명, 독립 결과 출력 |
+| DemoWorkspace | dsn-demo.v1 측정값 검증, 데모 상태·API 빈도 계산 |
 | BenchWorkspace / temperature 예제 | 앱 역할별 합성 데이터 / 공유 버전 규격 예제 |
 
 **Design rationale:** 서버 공통 계층에 NVMe나 특정 업무 schema를 넣지 않는다. Source와 Workspace가 이름·schema·단위를 합의한다. Workspace SDK는 Dsn.Contracts NuGet을 재사용한다. 모든 lease 사용은 호출 완료 안에 끝내며 detached 작업을 금지한다.
@@ -106,6 +107,7 @@ flowchart LR
 | View query / Exporter | 허용 Workspace 조회, field 투영, 내보내기 |
 | ViewDefinitions | 사용자별 정의를 ISavedViewStore에 저장 |
 | ViewEndpoints | 인증·scope·replay 권한, API·저장 오류 응답 |
+| Demo.html | telemetry-demo의 저장 결과 자동 조회·DUT 카드·추세 |
 | Presenter.html | 경로 표시, 표·현재 페이지 필터/차트, 원본·재처리 |
 
 **Design rationale:** 저장 데이터를 읽는 UI를 실행 중 plugin 상태에서 분리한다. 차트는 현재 페이지이며 전체 기간 검색·집계 엔진을 대신하지 않는다. 원본에는 여러 대상의 정보가 있으므로 모든 원래 Workspace에 대한 접근을 요구한다.

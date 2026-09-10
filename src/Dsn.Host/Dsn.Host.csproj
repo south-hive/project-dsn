@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <ExamplePluginDirectory>../../samples/Dsn.Workspaces.Examples/bin/$(Configuration)/$(TargetFramework)</ExamplePluginDirectory>
+    <ExamplePluginDirectory Condition="'$(RuntimeIdentifier)' != ''">$(ExamplePluginDirectory)/$(RuntimeIdentifier)</ExamplePluginDirectory>
+  </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Http/Demo.html" LogicalName="Dsn.Host.Demo.html" />
     <EmbeddedResource Include="Http/Presenter.html" LogicalName="Dsn.Host.Presenter.html" />
     <ProjectReference Include="../Dsn.Contracts/Dsn.Contracts.csproj" />
     <ProjectReference Include="../Dsn.Runtime/Dsn.Runtime.csproj" />
@@ -8,7 +13,7 @@
     <ProjectReference Include="../Dsn.Diagnostics/Dsn.Diagnostics.csproj" />
     <ProjectReference Include="../Dsn.View/Dsn.View.csproj" />
     <ProjectReference Include="../../samples/Dsn.Workspaces.Examples/Dsn.Workspaces.Examples.csproj" ReferenceOutputAssembly="false" />
-    <None Include="../../samples/Dsn.Workspaces.Examples/bin/$(Configuration)/$(TargetFramework)/Dsn.Workspaces.Examples.dll" Link="plugins/Dsn.Workspaces.Examples.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <None Include="../../samples/Dsn.Workspaces.Examples/bin/$(Configuration)/$(TargetFramework)/Dsn.Workspaces.Examples.deps.json" Link="plugins/Dsn.Workspaces.Examples.deps.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="$(ExamplePluginDirectory)/Dsn.Workspaces.Examples.dll" Link="plugins/Dsn.Workspaces.Examples.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="$(ExamplePluginDirectory)/Dsn.Workspaces.Examples.deps.json" Link="plugins/Dsn.Workspaces.Examples.deps.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

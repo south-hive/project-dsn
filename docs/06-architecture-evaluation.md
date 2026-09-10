@@ -58,3 +58,15 @@ O1~O3는 네트워크 차단 환경에서 DB만 옮겨 같은 웹으로 보는 �
 ## v0.1.0 미리보기 릴리즈 검증 (2026-09-10)
 
 Release 빌드 경고/오류 0, C# 단위 17 + 통합 10개 그룹, SDK 6개, 파이프라인 조건 변경·재처리·재시작 검사를 다시 통과했다. Portable ZIP을 임시 디렉터리에 풀고 포함된 Python wheel을 오프라인 설치하여 세 앱 입력 30건 → 원본 30건/결과 8건, SQLite·처리 경로·웹 UI·정상 종료를 확인했다. 약 17MB ZIP은 .NET 런타임을 포함하지 않으며 ASP.NET Core Runtime 10 또는 SDK 10을 별도 설치해야 한다. Termux 외 실행과 조회 전용 Viewer는 이번 릴리즈의 검증/구현 범위 밖이다.
+
+## 자동 앱 데모 추가 검증 (2026-09-10)
+
+[자동 E2E 데모](../samples/e2e/README.md)는 DUT별 별도 Python 프로세스 → telemetry-demo Workspace → scale → SQLite → 전용 /demo View를 연결한다. 4 DUT 192건, 8 DUT 384건에서 원본/결과 대응, 네 구간 판정, API 빈도·단위 변환, Host 재시작 뒤 동일 식별자·값을 확인했다. Chromium의 자동 페이지 조회·DUT 카드·추세·갱신 정지/재개·393px 화면 배치도 통과했다. 이는 합성 앱 기반 기능 검증이며 운영 부하나 실제 불량 판정 정확성을 검증한 것은 아니다.
+
+추가 단위 검사 포함 C# 18 + 통합 10개 그룹(경고/오류 0)을 통과했다. 데모 runner를 중단한 뒤 Host와 모든 DUT Source 프로세스가 종료되는 것도 확인했다.
+
+## 격리 환경·오프라인 의존 검증 (2026-09-10)
+
+`make offline-check DSN_BUILD_JOBS=1`은 새 venv와 빈 NuGet/pip cache에서 로컬 feed만 사용하여 Release build(경고/오류 0), C# 18+10개 그룹, SDK 6개, 4 DUT 192건 E2E 및 재시작 검증을 통과했다. 일반 외부 HTTP proxy는 연결 불가 주소로 지정했고 loopback 테스트만 우회했다. NuGet 5개와 Python 빌드 도구 3개의 원본 package·manifest·SHA-256을 약 20MB 반입 ZIP으로 만들었다. OS 수준 네트워크 격리 시험이나 SDK/OS 도구 자체의 오프라인 설치 검증은 아니다.
+
+SDK는 10.0.1xx 계열 안에서 patch를 허용하며 이번 실행은 Termux 10.0.111이다. linux-arm64 framework-dependent publish와 해당 RID의 plugin·SQLite native 파일 포함을 확인했다. Docker 빌드는 온라인을 전제로 한다. Docker SDK 10.0.103 태그의 존재를 확인했지만 Docker 실행은 미검증이다. [환경 구성과 명령](development-environment.md).

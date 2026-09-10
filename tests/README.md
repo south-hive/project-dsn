@@ -4,13 +4,15 @@
 
 | 명령 | 범위 |
 | --- | --- |
-| `make check` | C# Release build, 단위 17 + 통합 10개 그룹 |
+| `make demo-check` | DUT별 앱 생성·네 구간 판정·Filter·원본/결과 대응·HTTP·재시작 |
+| `make offline-check` | 빈 프로젝트 cache/venv에서 로컬 feed만으로 C#·SDK·E2E 전체 검증 |
+| `make check` | C# Release build, 단위 18 + 통합 10개 그룹 |
 | `make sdk-check` | C# 검사·SDK 패키징·SDK 검사 6개 |
 | `make pipeline-check` | C# 검사 + 앱 Source → ordered Filters → SQLite·조건 변경 replay·재시작 |
 | `make bench-check` | C# 검사 + 세 Python 앱 프로세스 수집·원본·재시작 |
 | `make ci` | C#·SDK 검사 성공 후 Docker 이미지 빌드 |
 
-작은 PC/Termux에서는 `DSN_BUILD_JOBS=1`을 지정한다. 로컬 HTTP 검사는 환경 프록시를 우회한다.
+Make와 check.sh는 프로젝트 전용 환경을 사용한다. [환경 준비와 OFFLINE=1](../docs/development-environment.md). 작은 PC/Termux에서는 `DSN_BUILD_JOBS=1`을 지정한다. 로컬 HTTP 검사는 환경 프록시를 우회한다.
 
 [SDK 검사](sdk/test_sources.py)는 binary/복사·포화·전송 실패·종료·동시 발행과 C++·Python → 실제 Host → Workspace → HTTP/재시작을 확인한다. Python wheel, 설치 CMake library, Contracts NuGet을 별도 소비 프로젝트에서 사용한다. `tests/pipeline.py`는 제외된 원본의 재처리, 안정적인 ID와 변경 revision, SQLite BLOB까지 검사한다.
 

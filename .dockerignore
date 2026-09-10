@@ -3,6 +3,7 @@
 !Directory.Build.props
 !Directory.Build.targets
 !global.json
+!NuGet.Config
 !src/
 !src/**
 !samples/

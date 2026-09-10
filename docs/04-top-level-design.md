@@ -67,7 +67,7 @@ flowchart LR
     O["사무 PC 브라우저"] -->|"인증된 HTTP / 배치 시 HTTPS proxy"| H
 ```
 
-HTTP와 입력 TCP의 bind를 분리한다. 원격 View를 열어도 입력은 loopback으로 유지할 수 있다. `/` UI shell만 공개하고 API에는 사용자 토큰·Workspace scope를 적용한다. 원본 조회/재처리는 모든 원래 대상의 권한을 요구한다. 입력 TCP 인증은 제공하지 않는다.
+HTTP와 입력 TCP의 bind를 분리한다. 원격 View를 열어도 입력은 loopback으로 유지할 수 있다. `/`와 `/demo` UI shell만 공개하고 API에는 사용자 토큰·Workspace scope를 적용한다. 원본 조회/재처리는 모든 원래 대상의 권한을 요구한다. 입력 TCP 인증은 제공하지 않는다.
 
 SQLite는 PC별 단일 Host가 소유한다. 결과·원본·사용자 View를 같은 DB에 저장하며 WAL/FULL을 사용한다. Termux에서는 system sqlite3, 일반 .NET 배포에서는 번들 native SQLite를 사용한다. [공급자 구성 근거](https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/custom-versions). WAL은 로컬 디스크 사용을 전제로 한다([SQLite WAL](https://www.sqlite.org/wal.html)). 실행 중 DB 파일 하나만 복사하면 최신 내용을 놓칠 수 있으므로 현재는 Host 정상 종료 후 데이터 디렉터리를 보존한다.
 

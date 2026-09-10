@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DSN · 자동 시험 데이터</title>
+<style>
+:root{font:15px system-ui,sans-serif;color:#dce8f1;background:#0e1720;color-scheme:dark}*{box-sizing:border-box}body{max-width:1200px;margin:auto;padding:24px}h1{font-size:28px;margin:8px 0}h2{font-size:19px}p,small{color:#a6bdcc;line-height:1.6}header{border-bottom:1px solid #314754;padding-bottom:18px}a{color:#83d6e5}section{margin-top:20px;padding:18px;border:1px solid #314754;border-radius:12px;background:#172630}.controls{display:flex;flex-wrap:wrap;gap:12px;align-items:end}label{display:grid;gap:6px}input,button,select{font:inherit;padding:10px;border:1px solid #426273;border-radius:6px;background:#10212c;color:inherit;max-width:100%}button{cursor:pointer;background:#235c6c}.grow{flex:1;min-width:170px}#state{white-space:pre-wrap;overflow-wrap:anywhere}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}.card{border:1px solid #36515f;border-radius:8px;padding:14px}.normal{color:#74d9b3}.warning{color:#ffcf77}.error{color:#ff9191}.value{font-size:23px;font-weight:650;margin:8px 0}.scroll{overflow:auto}table{width:100%;border-collapse:collapse;white-space:nowrap;font-size:13px}th,td{text-align:left;padding:9px;border-bottom:1px solid #314754}canvas{width:100%;height:220px;display:block}#legend{display:flex;gap:16px;flex-wrap:wrap}#path{overflow-wrap:anywhere}.badge{font-size:12px;border:1px solid #618394;padding:3px 8px;border-radius:20px}button:disabled{opacity:.5}@media(max-width:600px){body{padding:12px}section{padding:12px}.controls>*{flex:1 1 140px}}
+</style>
+<header><span class="badge">합성 앱 데이터 · 실제 장치 접근 없음</span><h1>DSN End-to-End 데모</h1><p>정상 → 지연 증가 → 오류 발생 → 회복을 반복합니다. 상태 판정은 데모 규칙이며 실제 불량 진단 기준이 아닙니다.</p><a href="/">일반 데이터 탐색 / 원본·재처리 열기</a></header>
+<section><div class="controls"><label class="grow">접속 토큰 · 로컬 모드는 빈 값<input id="token" type="password" autocomplete="off"></label><button id="connect">연결 / 다시 읽기</button><button id="pause">갱신 일시정지</button></div><p id="state" role="status">연결 중…</p><p id="path">Source → telemetry-demo → scale → sqlite → View</p><small>1초마다 새 저장 결과를 조회합니다. 차트·표는 이 화면이 읽은 최근 600건이며 전체 DB 통계가 아닙니다. 갱신을 멈춰도 Source는 계속 실행됩니다.</small></section>
+<section><h2>DUT별 마지막 수신 상태</h2><div id="cards" class="cards"></div></section>
+<section><div class="controls"><h2 class="grow">샘플 순서에 따른 추세</h2><label>측정값<select id="metric"><option value="latency_ms">지연 (ms)</option><option value="read_iops">Read IOPS</option><option value="write_iops">Write IOPS</option><option value="api_calls_per_sec">API 호출/초</option><option value="io_errors">구간 오류 수</option></select></label></div><div id="legend"></div><canvas id="chart" aria-label="DUT별 샘플 순서 추세"></canvas><small>각 선은 별도 DUT입니다. x축은 Source sequence, y축은 선택 측정값입니다.</small></section>
+<section><h2>최근 기록 <small id="count"></small></h2><div class="scroll"><table><thead><tr><th>DUT</th><th>순서</th><th>생성 구간</th><th>판정</th><th>지연 ms</th><th>Read IOPS</th><th>API/초</th><th>오류 수</th></tr></thead><tbody id="records"></tbody></table></div></section>
+<script>
+'use strict';
+const $=id=>document.getElementById(id), colors=['#70d9c0','#ffcd76','#92baff','#e69cdb','#b7dc7c','#fa9d8e','#b5a3ff','#83d5ed'];
+const labels={normal:'정상',latency:'지연 증가',errors:'오류 발생',recovery:'회복',warning:'주의',error:'오류'};
+const fields='id,dut_id,run_id,sequence,phase,assessment,latency_ms,read_iops,write_iops,api_calls_per_sec,io_errors,time,message_id';
+const run=new URLSearchParams(location.search).get('run');
+let rows=[],after=0,total=0,paused=false,busy=false,connected=false,generation=0,timer;
+async function api(path){const headers={};if($('token').value)headers.Authorization='Bearer '+$('token').value;const response=await fetch(path,{headers,cache:'no-store'});if(!response.ok)throw Error('HTTP '+response.status+' · '+(response.status===401?'토큰을 입력하고 연결하세요':response.status===403?'telemetry-demo 조회 권한을 확인하세요':'서버 응답을 확인하세요'));return response.json();}
+function text(parent,tag,value,className){const e=document.createElement(tag);e.textContent=value;if(className)e.className=className;parent.append(e);return e;}
+function groups(){const result=new Map();for(const row of rows){const key=row.run_id+'/'+row.dut_id;if(!result.has(key))result.set(key,[]);result.get(key).push(row);}return [...result.values()].sort((a,b)=>a.at(-1).dut_id.localeCompare(b.at(-1).dut_id));}
+function render(){
+  $('cards').replaceChildren();const grouped=groups();
+  for(const data of grouped){const r=data.at(-1),card=document.createElement('div');card.className='card';text(card,'strong',r.dut_id);text(card,'div',labels[r.assessment]||r.assessment,'value '+r.assessment);text(card,'div',Number(r.latency_ms).toFixed(3)+' ms · 오류 '+r.io_errors);text(card,'small',(labels[r.phase]||r.phase)+' · sequence '+r.sequence);text(card,'p',r.time);$('cards').append(card);}
+  if(!grouped.length)text($('cards'),'p','Source 데이터가 들어오면 DUT별 상태가 표시됩니다.');
+  $('records').replaceChildren();for(const r of rows.slice(-40).reverse()){const tr=document.createElement('tr');for(const v of [r.dut_id,r.sequence,labels[r.phase],labels[r.assessment],Number(r.latency_ms).toFixed(3),r.read_iops,Number(r.api_calls_per_sec).toFixed(1),r.io_errors])text(tr,'td',v);$('records').append(tr);}
+  $('count').textContent='최근 '+Math.min(40,rows.length)+'건 / 화면 보관 '+rows.length+'건';plot();
+}
+function plot(){
+  const c=$('chart'),g=c.getContext('2d'),w=c.clientWidth,h=220;
+  c.width=Math.max(1,w)*devicePixelRatio;c.height=h*devicePixelRatio;g.scale(devicePixelRatio,devicePixelRatio);
+  const grouped=groups(),metric=$('metric').value,all=rows.filter(r=>Number.isFinite(r[metric]));$('legend').replaceChildren();if(!all.length)return;
+  const loX=Math.min(...all.map(r=>r.sequence)),hiX=Math.max(...all.map(r=>r.sequence)),hiY=Math.max(1,...all.map(r=>r[metric]));
+  g.fillStyle='#a6bdcc';g.fillText('0 … '+hiY.toFixed(2),8,16);g.fillText('sequence '+loX+' … '+hiX,8,h-6);g.strokeStyle='#36515f';g.strokeRect(36,28,Math.max(1,w-50),150);
+  grouped.forEach((data,i)=>{const color=colors[i%colors.length];const label=text($('legend'),'span',data.at(-1).dut_id);label.style.color=color;g.strokeStyle=color;g.lineWidth=2;g.beginPath();data.forEach((r,j)=>{const x=36+(r.sequence-loX)/Math.max(1,hiX-loX)*(w-50),y=178-r[metric]/hiY*150;j?g.lineTo(x,y):g.moveTo(x,y);});g.stroke();});
+}
+async function poll(){
+  if(paused||busy||!connected)return;busy=true;const epoch=generation;
+  try{
+    // Bound catch-up work per tick. The cursor always advances, including other runs.
+    for(let page=0;page<5;page++){
+      const catalog=await api('/fields');if(epoch!==generation||paused)return;
+      if(!catalog['telemetry-demo']){$('state').textContent='연결됨 · Source 데이터 대기';return;}
+      const batch=await api('/view?'+new URLSearchParams({workspaces:'telemetry-demo',fields,afterId:after,limit:100}));if(epoch!==generation||paused)return;
+      if(!batch.length)break;after=batch.at(-1).id;const selected=batch.filter(r=>!run||r.run_id===run);total+=selected.length;rows=rows.concat(selected).slice(-600);if(batch.length<100)break;
+    }
+    render();$('state').textContent='연결됨 · 읽은 결과 '+total+'건 · 마지막 조회 '+new Date().toLocaleTimeString()+' · 새 데이터가 없으면 마지막 값을 유지합니다.';
+  }catch(e){if(epoch===generation)$('state').textContent=e.message;}finally{busy=false;}
+}
+async function connect(){
+  paused=false;$('pause').textContent='갱신 일시정지';$('state').textContent='연결 중…';
+  const epoch=++generation;connected=false;rows=[];after=0;total=0;render();
+  try{await api('/health');const p=await api('/pipelines');if(epoch!==generation||paused)return;if(!p['telemetry-demo'])throw Error('telemetry-demo Workspace 또는 조회 권한이 없습니다.');$('path').textContent=['Source','telemetry-demo',...p['telemetry-demo'].filters,...p['telemetry-demo'].sinks,'View'].join(' → ');connected=true;await poll();}catch(e){if(epoch===generation)$('state').textContent=e.message;}
+}
+$('connect').onclick=connect;$('metric').onchange=plot;$('pause').onclick=()=>{paused=!paused;$('pause').textContent=paused?'갱신 재개':'갱신 일시정지';if(paused)$('state').textContent='갱신 일시정지';else poll();};window.addEventListener('resize',plot);timer=setInterval(poll,1000);window.addEventListener('pagehide',()=>clearInterval(timer));connect();
+</script>
+</html>

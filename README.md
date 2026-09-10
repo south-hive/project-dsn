@@ -6,6 +6,16 @@
 
 [GitHub Releases](https://github.com/south-hive/project-dsn/releases)의 portable ZIP은 Host·웹 UI·Mock·SQLite native 파일·앱 예제·Python/C# SDK를 포함한다. ASP.NET Core Runtime 10 또는 .NET SDK 10을 설치한 뒤 압축을 풀고 `dotnet host/Dsn.Host.dll settings.pipeline.json`으로 실행한다. 런타임은 포함하지 않으며 Termux 외 OS 실행 검증은 아직 하지 않았다. 상세 실행·제약은 릴리즈 노트를 따른다.
 
+## 개발 환경 / 오프라인 빌드
+
+Make 명령은 `.dev`의 Python venv와 전용 NuGet 캐시를 사용한다. SDK는 `global.json`의 **10.0.1xx 계열**로 제한하고(OS별 patch 차이는 허용), 프로젝트별 NuGet lock을 유지한다. `make env`, `make doctor`, `make build`, `make check`로 준비·확인·빌드·검증한다. SDK는 `make -f make/sdk.mk sdk-pack`, 배포는 `make -f make/deploy.mk deploy`로 나눠 실행할 수도 있다. 기존 루트 명령도 유지한다.
+
+인터넷 가능한 PC에서 `make offline-pack`으로 의존 패키지 ZIP을 준비하고, 망 분리 PC의 저장소 루트에 풀어 `make build OFFLINE=1`로 빌드한다. 빈 캐시 검증은 `make offline-check DSN_BUILD_JOBS=1`이다. SDK와 기본 개발 도구는 별도 설치가 필요하며 패키지 ZIP은 Git에 포함하지 않는다. [구성과 전체 명령](docs/development-environment.md).
+
+## 자동 데이터로 End-to-End 확인
+
+`make demo DSN_BUILD_JOBS=1`이면 Host와 DUT별 합성 앱 Source가 함께 실행된다. 출력되는 `/demo` 주소에서 정상 → 지연 증가 → 오류 → 회복 추세를 자동으로 볼 수 있다. 기본 4 DUT가 약 2분간 데이터를 생성하고, 이후 웹은 Ctrl+C까지 유지된다. `make demo-check DSN_BUILD_JOBS=1`은 수집·Workspace·Filter·SQLite·HTTP·재시작까지 자동 검증한다. [데모 설정과 상세 설명](samples/e2e/README.md). 현재 소스에 추가된 기능이며 v0.1.0 ZIP에는 포함되지 않는다.
+
 ## 로컬 실행
 
 ```sh
@@ -82,7 +92,7 @@ make publish
 
 ## Docker / CI
 
-Linux Docker Engine + Compose v2에서 `make deploy`, `make logs`, `make down`을 사용한다. `make docker-config`는 임의 토큰과 echo/hex/bench 권한을 가진 `settings.docker.json`을 처음 한 번 생성한다. 기존 파일은 보존하며 컨테이너 포트 전달에는 `ingressBind=0.0.0.0`이 필요하다. 생성 파일의 토큰은 HTTP Bearer로 전달한다.
+**Docker 빌드는 온라인 환경을 전제로 하며 기본 이미지와 NuGet 패키지를 다운로드한다.** Linux Docker Engine + Compose v2에서 `make deploy`, `make logs`, `make down`을 사용한다. `make docker-config`는 임의 토큰과 echo/hex/bench 권한을 가진 `settings.docker.json`을 처음 한 번 생성한다. 기존 파일은 보존하며 컨테이너 포트 전달에는 `ingressBind=0.0.0.0`이 필요하다. 생성 파일의 토큰은 HTTP Bearer로 전달한다.
 
 이미지는 Host·plugin과 대상 아키텍처의 SQLite native library를 포함하고 SDK·Mock·소스·PDB는 제외한다. ASP.NET Chiseled Extra runtime을 사용한다. Compose는 호스트 loopback에만 포트를 열고 `/data` volume을 보존한다. 외부 웹 공개는 별도 HTTPS proxy가 필요하다. Docker build/run 자체는 이 Termux 검증에 포함하지 않는다.
 

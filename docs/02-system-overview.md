@@ -29,7 +29,7 @@ flowchart LR
 
 | 경로 | 동작 |
 | --- | --- |
-| GET / | 공개된 빈 웹 UI. 데이터는 인증된 API로만 접근 |
+| GET /, /demo | 일반 탐색 / 합성 데이터 전용 웹 UI. 데이터는 인증된 API로만 접근 |
 | GET /health | 준비 상태 |
 | GET /workspaces, /fields | 허용 Workspace·저장 field 목록 |
 | GET /pipelines | 허용 처리 경로의 Filter/Sink 이름과 revision |

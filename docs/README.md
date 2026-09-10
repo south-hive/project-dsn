@@ -14,3 +14,5 @@
 그림은 Mermaid로 작성했다. 구조 그림의 화살표는 의존/호출, 시퀀스 그림은 시간 순서이며, 다른 의미를 쓰는 그림은 본문에 명시한다. 문서의 컴포넌트는 논리 단위로, 반드시 별도 assembly나 프로세스를 뜻하지 않는다.
 
 [실행 안내](../README.md) · [설정 기본값](../settings.example.json) · [공개 계약 코드](../src/Dsn.Contracts/Workspaces.cs)
+
+[개발 환경·Make 명령·오프라인 반입 안내](development-environment.md)는 위 아키텍처 6개 문서와 별도의 실행 참고 자료다.

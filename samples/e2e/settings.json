@@ -1,0 +1,11 @@
+{
+  "bind": "127.0.0.1", "ingressBind": "127.0.0.1",
+  "rpcPort": 7070, "viewPort": 7071, "dataDirectory": "data/e2e",
+  "retainRaw": true,
+  "pipelines": {
+    "telemetry-demo": {
+      "filters": [{"type":"scale","options":{"field":"latency_us","output":"latency_ms","factor":0.001}}],
+      "sinks": ["sqlite"]
+    }
+  }
+}

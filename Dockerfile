@@ -1,11 +1,12 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.103 AS build
 ARG TARGETARCH
 WORKDIR /source
-COPY Directory.Build.props Directory.Build.targets global.json ./
+COPY Directory.Build.props Directory.Build.targets global.json NuGet.Config ./
 COPY src/ src/
 COPY samples/ samples/
 RUN case "$TARGETARCH" in amd64) DSN_RUNTIME=linux-x64 ;; arm64) DSN_RUNTIME=linux-arm64 ;; *) echo "Unsupported TARGETARCH" >&2; exit 1 ;; esac \
- && dotnet publish src/Dsn.Host/Dsn.Host.csproj -c Release -o /out/host --nologo -r "$DSN_RUNTIME" --self-contained false \
+ && dotnet restore src/Dsn.Host/Dsn.Host.csproj --locked-mode --configfile NuGet.Config --nologo \
+ && dotnet publish src/Dsn.Host/Dsn.Host.csproj -c Release -o /out/host --no-restore --nologo -r "$DSN_RUNTIME" --self-contained false \
     -p:DebugType=None -p:DebugSymbols=false \
  && mkdir /out/data
 

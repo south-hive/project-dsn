@@ -316,6 +316,29 @@ await suite.Test("SQLite legacy import is atomic, repeat-safe and leaves input f
 });
 static FilterDefinition Filter(string type, object options) => new(type, JsonSerializer.SerializeToElement(options));
 
+await suite.Test("demo Workspace validates measurements, derives assessment and returns leases on failure", async () =>
+{
+    var lifetime = new Lifetime(); var records = new MemoryRecordStore(); var workspace = new DemoWorkspace();
+    var valid = """{"schema":"dsn-demo.v1","pc_id":"pc","dut_id":"dut-01","run_id":"run","sequence":0,"phase":"normal","interval_ms":500,"latency_us":100,"read_iops":12000,"write_iops":2000,"api_calls":100,"io_errors":0}""";
+    foreach (var payload in new[] { valid, valid.Replace("\"latency_us\":100", "\"latency_us\":900"), valid.Replace("\"io_errors\":0", "\"io_errors\":2") })
+    {
+        var root = lifetime.Create(Suite.Message("demo", [workspace.Name], Encoding.UTF8.GetBytes(payload)))!;
+        using (var context = new MessageContext(root, workspace.Name, records)) await workspace.ProcessAsync(context, default);
+        Suite.Equal(1L, lifetime.Stats.References); root.Release();
+    }
+    var rows = records.Query(new());
+    Suite.Equal("normal,warning,error", string.Join(',', rows.Select(r => r.Fields["assessment"].GetString())));
+    Suite.Equal(200.0, rows[0].Fields["api_calls_per_sec"].GetDouble());
+    foreach (var invalid in new[] { "[]", valid.Replace("dsn-demo.v1", "dsn-demo.v2"), valid.Replace("\"interval_ms\":500", "\"interval_ms\":0"),
+        valid.Replace("\"latency_us\":100", "\"latency_us\":-1"), valid.Replace("\"io_errors\":0", "\"io_errors\":\"bad\"") })
+    {
+        var root = lifetime.Create(Suite.Message("demo", [workspace.Name], Encoding.UTF8.GetBytes(invalid)))!;
+        using var context = new MessageContext(root, workspace.Name, records);
+        await Suite.ThrowsAsync<FormatException>(() => workspace.ProcessAsync(context, default).AsTask());
+        Suite.Equal(1L, lifetime.Stats.References); root.Release();
+    }
+    Suite.Equal(0L, lifetime.Stats.References); Suite.Equal(3, records.Query(new()).Count);
+});
 suite.Finish();
 
 sealed class DelegateFilter(Func<RecordInput, RecordInput?> transform) : IRecordFilter

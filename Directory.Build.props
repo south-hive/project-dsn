@@ -5,7 +5,14 @@
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <UseAppHost>false</UseAppHost>
+    <!-- Keep portable builds and supported Docker publish RIDs in the same lock graph. -->
+    <RuntimeIdentifiers>linux-x64;linux-arm64</RuntimeIdentifiers>
+    <!-- Framework-dependent bundles use the installed runtime; do not fetch unused RID packs. -->
+    <EnableRuntimePackDownload Condition="'$(SelfContained)' != 'true'">false</EnableRuntimePackDownload>
+    <EnableAppHostPackDownload Condition="'$(UseAppHost)' == 'false'">false</EnableAppHostPackDownload>
     <Deterministic>true</Deterministic>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestoreLockedMode Condition="'$(RestoreLockedMode)' == ''">true</RestoreLockedMode>
     <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
   </PropertyGroup>
 </Project>

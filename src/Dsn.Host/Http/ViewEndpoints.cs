@@ -14,7 +14,7 @@ internal static class ViewEndpoints
         web.Use(async (context, next) =>
         {
             // Only the empty UI shell is public; every data request still requires authentication.
-            if (context.Request.Path == "/") { await next(context); return; }
+            if (context.Request.Path == "/" || context.Request.Path == "/demo") { await next(context); return; }
             string? user = null;
             if (settings.Users.Count == 0) user = "local";
             else
@@ -44,6 +44,12 @@ internal static class ViewEndpoints
         web.MapGet("/", () =>
         {
             using var resource = typeof(ViewEndpoints).Assembly.GetManifestResourceStream("Dsn.Host.Presenter.html")!;
+            using var reader = new StreamReader(resource);
+            return Results.Content(reader.ReadToEnd(), "text/html; charset=utf-8");
+        });
+        web.MapGet("/demo", () =>
+        {
+            using var resource = typeof(ViewEndpoints).Assembly.GetManifestResourceStream("Dsn.Host.Demo.html")!;
             using var reader = new StreamReader(resource);
             return Results.Content(reader.ReadToEnd(), "text/html; charset=utf-8");
         });
