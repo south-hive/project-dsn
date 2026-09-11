@@ -4,6 +4,7 @@
 
 | 명령 | 범위 |
 | --- | --- |
+| `make env-check` | SDK 누락/불일치 복구 안내, 로컬 SDK 우선, python3/python 선택·override, venv 미생성 |
 | `make demo-check` | DUT별 앱 생성·네 구간 판정·Filter·원본/결과 대응·HTTP·재시작 |
 | `make offline-check` | 빈 프로젝트 NuGet cache와 별도 SDK 도구 디렉터리에서 로컬 feed만으로 C#·SDK·E2E 전체 검증 |
 | `make check` | C# Release build, 단위 18 + 통합 10개 그룹 |

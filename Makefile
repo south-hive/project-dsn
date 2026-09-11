@@ -7,10 +7,11 @@ export OFFLINE ?= 0
 RUN := bash scripts/dev.sh
 DEMO_ARGS ?=
 
-.PHONY: help env doctor restore deps-update build clean check test publish demo demo-check pipeline-host pipeline-check bench-host bench-sources bench-check offline-pack offline-check
+.PHONY: help env env-check doctor restore deps-update build clean check test publish demo demo-check pipeline-host pipeline-check bench-host bench-sources bench-check offline-pack offline-check
 help:
 	@printf '%s\n' \
 	  'env / doctor    Prepare/check .NET SDK selection and project caches' \
+	  'env-check       Test environment recovery and interpreter selection' \
 	  'restore         Restore locked packages (OFFLINE=1 for local feed)' \
 	  'build           Build solution with isolated caches' \
 	  'clean           Clean C# build outputs; retain collected data' \
@@ -28,6 +29,9 @@ help:
 
 env:
 	$(RUN) setup
+
+env-check:
+	bash tests/dev-environment.sh
 
 doctor: env
 	$(RUN) doctor
@@ -68,7 +72,7 @@ bench-host: build
 	$(RUN) dotnet src/Dsn.Host/bin/Release/net10.0/Dsn.Host.dll
 
 bench-sources: env
-	$(RUN) env PYTHONPATH="$(CURDIR)/sdk/source/python/src" python samples/bench/source.py
+	PYTHONPATH="$(CURDIR)/sdk/source/python/src" $(RUN) python samples/bench/source.py
 
 bench-check: check
 	$(RUN) python tests/bench.py

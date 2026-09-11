@@ -16,3 +16,24 @@ if [[ -x "$DSN_ROOT/.dev/dotnet/dotnet" ]]; then
   export DOTNET_ROOT="$DSN_ROOT/.dev/dotnet"
   export PATH="$DOTNET_ROOT:$PATH"
 fi
+
+# Resolve Python only for optional Python commands; .NET setup never invokes it.
+dsn_select_python() {
+  local candidate
+  if [[ -n "${DSN_PYTHON:-}" ]]; then
+    if command -v "$DSN_PYTHON" >/dev/null 2>&1 && "$DSN_PYTHON" -c 'import sys; sys.exit(sys.version_info < (3, 10))' >/dev/null 2>&1; then
+      export DSN_PYTHON
+      return 0
+    fi
+  else
+    for candidate in python3 python; do
+      if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -c 'import sys; sys.exit(sys.version_info < (3, 10))' >/dev/null 2>&1; then
+        DSN_PYTHON=$(command -v "$candidate")
+        export DSN_PYTHON
+        return 0
+      fi
+    done
+  fi
+  printf 'DSN: Python 3.10+ is required for this optional command. Install python3 or set DSN_PYTHON to its executable path. .NET build/check do not require Python.\n' >&2
+  return 1
+}

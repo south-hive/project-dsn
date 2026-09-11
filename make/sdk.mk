@@ -32,7 +32,7 @@ sample-host: build
 	$(RUN) dotnet src/Dsn.Host/bin/Release/net10.0/Dsn.Host.dll samples/temperature/settings.json
 
 sample-python: env
-	$(RUN) env PYTHONPATH="$(CURDIR)/sdk/source/python/src" python samples/temperature/source.py
+	PYTHONPATH="$(CURDIR)/sdk/source/python/src" $(RUN) python samples/temperature/source.py
 
 sample-cpp: sdk-build
 	$(RUN) artifacts/source-cpp/temperature_source

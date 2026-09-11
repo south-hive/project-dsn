@@ -10,7 +10,7 @@
 
 ## 개발 환경 / 오프라인 빌드
 
-기본 개발·빌드 환경은 .NET SDK와 `.dev`의 전용 NuGet 캐시·CLI 상태로 구성하며 Python/venv가 필요 없다. Python은 Source 예제·데모·SDK 패키징 같은 선택 명령에서만 사용한다. SDK는 `global.json`의 **10.0.1xx 계열**로 제한하고(OS별 patch 차이는 허용), 프로젝트별 NuGet lock을 유지한다. `make env`, `make doctor`, `make build`, `make check`로 준비·확인·빌드·검증한다. SDK는 `make -f make/sdk.mk sdk-pack`, 배포는 `make -f make/deploy.mk deploy`로 나눠 실행할 수도 있다. 기존 루트 명령도 유지한다.
+기본 개발·빌드 환경은 .NET SDK와 `.dev`의 전용 NuGet 캐시·CLI 상태로 구성하며 Python/venv가 필요 없다. Python은 Source 예제·데모·SDK 패키징 같은 선택 명령에서만 사용한다. SDK는 `global.json`에서 **.NET 10.0의 최신 설치 SDK**를 선택하고(`latestFeature`, 10.0.100 이상), 프로젝트별 NuGet lock을 유지한다. `make env`, `make doctor`, `make build`, `make check`로 준비·확인·빌드·검증한다. SDK는 `make -f make/sdk.mk sdk-pack`, 배포는 `make -f make/deploy.mk deploy`로 나눠 실행할 수도 있다. 기존 루트 명령도 유지한다.
 
 인터넷 가능한 PC에서 `make offline-pack`으로 의존 패키지 ZIP을 준비하고, 망 분리 PC의 저장소 루트에 풀어 `make build OFFLINE=1`로 빌드한다. 빈 캐시 검증은 `make offline-check DSN_BUILD_JOBS=1`이다. SDK와 기본 개발 도구는 별도 설치가 필요하며 패키지 ZIP은 Git에 포함하지 않는다. [구성과 전체 명령](docs/development-environment.md).
 

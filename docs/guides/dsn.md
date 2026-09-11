@@ -26,7 +26,7 @@ flowchart TD
 
 ## 개발·검증
 
-기본 도구는 .NET SDK 10.0.1xx, Bash, GNU Make다. Python/venv는 기본 C# 빌드·검사에 필요 없다. SDK 선택·NuGet lock·캐시는 [공통 환경](../development-environment.md)에서 관리한다.
+기본 도구는 .NET SDK 10.0 (10.0.100 이상), Bash, GNU Make다. Python/venv는 기본 C# 빌드·검사에 필요 없다. SDK 선택·NuGet lock·캐시는 [공통 환경](../development-environment.md)에서 관리한다.
 
 ```sh
 make doctor
