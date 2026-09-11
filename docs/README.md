@@ -16,3 +16,7 @@
 [실행 안내](../README.md) · [설정 기본값](../settings.example.json) · [공개 계약 코드](../src/Dsn.Contracts/Workspaces.cs)
 
 [개발 환경·Make 명령·오프라인 반입 안내](development-environment.md)는 위 아키텍처 6개 문서와 별도의 실행 참고 자료다.
+
+## 개발 가이드
+
+개발·검증·배포·실행 절차는 [개발 가이드](guides/README.md)에서 대상별로 찾는다. [DSN](guides/dsn.md) · [Source](guides/source.md) · [Workspace](guides/workspace.md) · [View](guides/view.md). 아키텍처 6개 문서는 설계 근거를 유지하고 API 상세는 기존 SDK 문서를 참조한다.

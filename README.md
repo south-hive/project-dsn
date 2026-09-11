@@ -76,6 +76,8 @@ dotnet run --project src/Dsn.Host -c Release --no-build -- settings.example.json
 
 ## SDK와 개발
 
+개발 대상별 절차는 [개발 가이드](docs/guides/README.md)에서 선택한다: [DSN](docs/guides/dsn.md) · [Source](docs/guides/source.md) · [Workspace](docs/guides/workspace.md) · [View](docs/guides/view.md).
+
 [SDK 안내](sdk/README.md), [Workspace·Filter 개발](sdk/workspace/README.md). payload 스키마는 Source와 해당 Workspace가 합의하며 공통 서버에 업무 의미를 강제하지 않는다. 새 Workspace는 `EmitAsync`로 독립 field를 출력한다. 기존 `WorkspaceServices.Records` 직접 저장도 동일 Filter/Sink 경로를 거친다.
 
 ```sh

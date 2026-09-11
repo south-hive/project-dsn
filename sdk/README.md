@@ -10,6 +10,8 @@ Source SDK는 bytes를 전송하고, Workspace SDK는 서버 안에서 그 bytes
 
 두 Source와 Workspace가 같은 규격으로 연동하는 [온도 예제](../samples/temperature/README.md)를 먼저 실행하면 전체 흐름을 볼 수 있다. 업무 payload 규격은 해당 예제/업무 모듈이 소유하며 Source SDK에 넣지 않는다.
 
+실제 개발 순서는 [Source 개발자 가이드](../docs/guides/source.md)와 [Workspace 개발자 가이드](../docs/guides/workspace.md)를 참고한다.
+
 ## 빌드와 배포
 
 ```bash
