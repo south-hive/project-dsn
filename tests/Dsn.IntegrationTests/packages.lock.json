@@ -49,11 +49,11 @@
         "type": "Project",
         "dependencies": {
           "Dsn.Contracts": "[0.1.0, )",
-          "Dsn.Diagnostics": "[1.0.0, )",
-          "Dsn.Ingress": "[1.0.0, )",
-          "Dsn.Persistence": "[1.0.0, )",
-          "Dsn.Runtime": "[1.0.0, )",
-          "Dsn.View": "[1.0.0, )"
+          "Dsn.Diagnostics": "[0.1.0, )",
+          "Dsn.Ingress": "[0.1.0, )",
+          "Dsn.Persistence": "[0.1.0, )",
+          "Dsn.Runtime": "[0.1.0, )",
+          "Dsn.View": "[0.1.0, )"
         }
       },
       "dsn.ingress": {

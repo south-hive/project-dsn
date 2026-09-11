@@ -1,5 +1,7 @@
 # DSN
 
+현재 개발 버전은 **0.1.0**이다. .NET 프로젝트의 제품·패키지 버전은 [Directory.Build.props](Directory.Build.props)에서 공통 관리하며, Python/C++ Source SDK도 0.1.0을 사용한다. 같은 버전으로 개발을 이어가므로 배포본 구분에는 커밋도 함께 기록한다. 프로토콜 및 plugin API 버전 1은 별도 계약이다.
+
 앱 Source가 보내는 다양한 payload를 **Source → Filter → Sink**로 처리하는 C#/.NET 10 프로그램이다. 로컬 PC에서 수집·원본 보존·Workspace 해석·조건 처리·SQLite 저장·웹 조회·재처리까지 실행한다. C++·Python Source SDK와 C# Workspace/Filter 계약을 제공한다. 검증은 앱 Source 기준이며 드라이버 연동은 담당자 영역이다.
 
 ## 릴리즈로 실행

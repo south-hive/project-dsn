@@ -20,6 +20,10 @@ flowchart TD
 
 그림은 프로젝트 의존 방향이다. Host가 기능을 조립하며 기능 프로젝트 사이의 직접 참조는 금지한다. 자세한 요소와 근거는 [컴포넌트 설계](../05-component-design.md)를 따른다. 공개 계약을 바꿀 때는 Source protocol, plugin API, 업무 payload 버전을 서로 구분하고 기존 소비자 호환성을 확인한다.
 
+## 버전
+
+현재 제품 버전은 `0.1.0`이며 [Directory.Build.props](../../Directory.Build.props)의 `Version`이 모든 .NET 프로젝트와 Contracts NuGet에 적용된다. AssemblyVersion/FileVersion은 `0.1.0.0`으로 생성된다. Python SDK의 pyproject.toml과 C++ SDK의 CMakeLists.txt도 현재 `0.1.0`이다. 향후 제품 버전을 변경할 때 이 세 위치와 NuGet lock을 함께 확인한다. 기존 릴리즈 태그를 덮어쓰지 않으며 동일 버전 내 변경은 커밋으로 식별한다.
+
 ## 개발·검증
 
 기본 도구는 .NET SDK 10.0.1xx, Bash, GNU Make다. Python/venv는 기본 C# 빌드·검사에 필요 없다. SDK 선택·NuGet lock·캐시는 [공통 환경](../development-environment.md)에서 관리한다.
